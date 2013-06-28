@@ -1,0 +1,7 @@
+   * Why is the colour often stuffed up on the photos?
+   * Sometimes the airplay logo disappears. Note that it comes back if I click refresh in Bonjour Browser?
+   * screensaver comes
+   * can we listen for connections in the background? Perhaps not...
+   * scrubbing, stopping, etc
+   * mirroring
+   * Can either display photos or video but not both. Need to call screen.finish() for one if we start the other!
