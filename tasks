@@ -1,7 +1,10 @@
    * Why is the colour often stuffed up on the photos?
    * Sometimes the airplay logo disappears. Note that it comes back if I click refresh in Bonjour Browser?
-   * screensaver comes
+   * screensaver comes on when viewing photos
    * can we listen for connections in the background? Perhaps not...
    * scrubbing, stopping, etc
    * mirroring
-   * Can either display photos or video but not both. Need to call screen.finish() for one if we start the other!
+   * Cannot start a stream at the correct position. This is a three-fold problem:
+      * iOS tells us the proportion through the file to start (eg 47%), and Roku wants the number of seconds (can we use roUrlTransfer to get the first packet and inspect the header for the length?) 
+      * Roku cannot/will not tell us the length of the file, and 
+      * Even giving roku an integer offset doesn't seem to work :(

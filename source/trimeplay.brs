@@ -10,6 +10,20 @@ Function Main()
     m.video_paused = true
     m.video_position = 0
 
+    device_info = createobject("roDeviceInfo")
+    m.display_size = device_info.getDisplaySize()
+
+    default_screen = createobject("roImageCanvas")
+    default_screen.SetMessagePort(msgPort)
+    default_screen.SetLayer(0, {Color:"#FF000000", CompositionMode:"Source"}) 
+    default_screen.SetLayer(1, {text:"Waiting for connection"
+                           TextAttrs:{Color:"#FFCCCCCC", Font:"Medium",
+                                     HAlign:"HCenter", VAlign:"VCenter",
+                                  Direction:"LeftToRight"}
+                                 TargetRect:{x:0,y:0,w:m.display_size.w,h:m.display_size.h}})
+
+    default_screen.show()
+
     m.reversals = {}
     connections = {}
     http_requests = {}
@@ -118,7 +132,7 @@ Function Main()
             if event.isStreamStarted()
                print "isStarted"
                if m.video_paused then
-                   m.screen.Pause()
+                   m.video_screen.Pause()
                end if
                m.video_position = event.GetIndex()
             else if event.isPlaybackPosition()

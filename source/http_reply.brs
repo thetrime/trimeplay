@@ -70,29 +70,34 @@ End Function
 
 Function handle_photo(http as Object, connection as Object)
     print "About to save data to file..." ; str(http.body.Count())
-    print http.body.WriteFile("tmp:/myphoto1.jpg")
-    bitmap = CreateObject("roBitmap", "tmp:/myphoto1.jpg")
+    filename = "tmp:/" + http.headers["X-Apple-AssetKey"] + ".jpg"
+    print http.body.WriteFile(filename)
+    bitmap = CreateObject("roBitmap", filename)
     print "About to draw image: " ; bitmap
-    if m.state = "none" Then
-        m.screen = createobject("roScreen")
-        m.screen.SetPort(m.port)
-    Else if m.state = "video" Then
-        m.screen.Close()
+    If m.state <> "photo" Then
+        m.photo_screen = createobject("roImageCanvas")
+        m.photo_screen.SetMessagePort(m.port)
+        m.photo_screen.SetLayer(0, {Color:"#FF000000", CompositionMode:"Source"}) 
+        if m.state = "video" Then
+            m.video_screen.Close()
+        End If
+        m.photo_screen.show()
     End If
     m.state = "photo"
-    m.screen.clear(0)
-    x_offset = (m.screen.GetWidth() - bitmap.GetWidth())/2
-    y_offset = (m.screen.GetHeight() - bitmap.GetHeight())/2
-    m.screen.DrawObject(x_offset, y_offset, bitmap)
-    m.screen.SwapBuffers()   
+    screen_width = m.display_size.w
+    screen_height = m.display_size.h
+    x_offset = Int((screen_width - bitmap.GetWidth())/2)
+    y_offset = Int((screen_height - bitmap.GetHeight())/2)
+    m.photo_screen.SetLayer(1, [{url:filename,
+                    TargetRect:{x:x_offset, y:y_offset, w:bitmap.GetWidth(), h:bitmap.getHeight()}}])
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
 Function handle_stop(http as Object, connection as Object)
     If m.state = "video" Then
-       m.screen.Close()
+       m.video_screen.Close()
     Else If m.state = "photo" Then
-       m.screen = invalid
+       m.photo_screen.Close()
     End If
     m.state = "none"
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
@@ -127,13 +132,14 @@ Function handle_play(http as Object, connection as Object)
             End If
         End For
     End If
-    if m.state = "none" Then
-        m.screen = createobject("roVideoScreen")
-        m.screen.SetPositionNotificationPeriod(1)
-        m.screen.SetMessagePort(m.port)
-    Else if m.state = "photo" Then
-        ' This is apparently the only way to close the roScreen :S (you had better hope it gets GCd!)
-        m.screen = invalid
+    if m.state <> "video" Then
+        m.video_screen = createobject("roVideoScreen")
+        m.video_screen.SetPositionNotificationPeriod(1)
+        m.video_screen.SetMessagePort(m.port)
+        If m.state = "photo" then
+            m.photo_screen.close()
+        End if
+       m.video_screen.show()
     End If
     m.state = "video"
 
@@ -154,8 +160,7 @@ Function handle_play(http as Object, connection as Object)
                            PlayStart:50
                         PlayDuration:30}
        content.StreamFormat = "mp4"
-       m.screen.setContent(content)
-       m.screen.show()
+       m.video_screen.setContent(content)
        m.video_paused = false       
     End If
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
@@ -230,10 +235,10 @@ Function handle_rate(http as Object, connection as Object)
     print http.search["value"]
     if val(http.search["value"]) = 0 Then
        print "Pausing"
-       m.screen.Pause()
+       m.video_screen.Pause()
     Else if val(http.search["value"]) = 1 Then
        print "Resuming"
-       m.screen.Resume()
+       m.video_screen.Resume()
     Else
        print "unexpected rate:" ; http.search["value"]
     End If

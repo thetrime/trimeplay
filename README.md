@@ -3,9 +3,22 @@ trimeplay
 
 Airplay server for Roku.
 
-Very experimental at this stage. Can play videos stored on the iDevice and streams (such as youtube), and could view photos until I broke it by changing the screen to only display videos. 
+Very experimental at this stage. 
 
-Cannot control the videos yet. See the tasks for a list of important things to be done before this is anything more than a research project.
+Things that work:
+   * Viewing photos (although they don't appear to look very good. I think there's an off-by-one error in the transfer somewhere)
+   * Changing the photo you are looking at
+   * Stopping photo viewing
+   * Viewing videos from the Video app. Only ones without DRM!
+   * Viewing videos from third parties, such as youtube (Again, only without DRM)
+   * Pausing and resuming video
+   * Stopping videos
+
+What does not:
+   * Anything with DRM
+      * That includes mirroring, surprisingly!
+   * Starting videos in the right place (for reasons that are tremendously stupid)
+   * Scrubbing videos
 
 
 LICENSE:
