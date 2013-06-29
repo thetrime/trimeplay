@@ -1,8 +1,13 @@
 PROJECT=$(shell pwd | sed -e 's@.*/@@g')
-
+DATE=$(shell date +"%s")
 all: $(PROJECT).zip
+SOURCES=source/*.brs manifest
 
-SOURCES=source/*.brs
+.PHONY: manifest
+
+manifest:
+	@cp manifest.stub manifest
+	@echo $(DATE) >> manifest
 
 $(PROJECT).zip:	$(SOURCES)
 	zip -ru $(PROJECT).zip source manifest -x \*~

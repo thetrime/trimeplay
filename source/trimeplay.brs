@@ -1,7 +1,7 @@
 Function Main()
     msgPort = createobject("roMessagePort") 
     m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
-    m.features = "3" '0x93
+    m.features = "3"
     'm.features = "0x39f7"
 
     ' Set up some stuff so we can display screens later in the http handlers
