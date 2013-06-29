@@ -76,7 +76,11 @@ Function parse_http_header_name(connection as Object, request as Object)
         Else If code = 10 Then
            ' Must be end of headers
            request.state = 6
-           request.content_length = val(request.headers["content-length"])
+           if request.headers["content-length"] <> invalid then
+               request.content_length = val(request.headers["content-length"])
+           else
+               request.content_length = 0
+           end if
            parse_http_body(connection, request)
            Exit While
         Else If code = 58 Then
