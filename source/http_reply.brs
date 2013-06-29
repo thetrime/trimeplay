@@ -1,3 +1,11 @@
+Function handle_fairplay(http as Object, connection as Object)
+    packet = "HTTP/1.1 404 Not Found" + chr(13) + chr(10)
+    reply.fromAsciiString(packet)
+    status = connection.send(reply, 0, reply.Count())
+    return status    
+End Function
+
+
 Function handle_reverse(http as Object, connection as Object)
     reply = createobject("roByteArray")
     reply.fromAsciiString("HTTP/1.1 101 Switching Protocols" + chr(13) + chr(10) + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10) + "Upgrade: PTTH/1.0" + chr(13) + chr(10) + "Connection: Upgrade" + chr(13) + chr(10) + chr(13) + chr(10))
@@ -103,6 +111,12 @@ Function handle_stop(http as Object, connection as Object)
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
+Function handle_scrub(http as Object, connection as Object)
+    duration = 1200 ' FIXME: No it isnt
+    return send_http_reply(connection, "text/parameters", list_concat_with_newlines(["duration: " + str(duration), "position: " + str(m.video_position)]))
+End Function
+
+
 Function handle_play(http as Object, connection as Object)
     params = {}
     name = createobject("roByteArray")
@@ -192,41 +206,53 @@ End Function
 
 Function handle_playback_info(http as Object, connection as Object)
     If m.video_paused Then    
-        rate = "    <key>rate</key> <real>0</real>"
+        f_rate = "0"
     Else
-        rate = "    <key>rate</key> <real>1</real>"
+        f_rate = "1"
     End If
-    position = "    <key>position</key><real>" + str(m.video_position) + "</real>"
-
-    return send_http_reply(connection, "text/x-apple-plist+xml", list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
+    duration = "1200.0" 'FIXME: No it isnt
+    position = str(m.video_position) ' FIXME: trim spaces?
+    body= list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
                                                                                         "<!DOCTYPE plist PUBLIC " + chr(34) + "-//Apple//DTD PLIST 1.0//EN" + chr(34) + " " + chr(34) + "http://www.apple.com/DTDs/PropertyList-1.0.dtd" + chr(34) + ">",
                                                                                         "<plist version=" + chr(34) + "1.0" + chr(34) + ">",
                                                                                         " <dict>",
-                                                                                        "   <key>duration</key> <real>1801</real>",
+                                                                                        "   <key>duration</key>",
+                                                                                        "   <real>"+duration+"</real>",
                                                                                         "   <key>loadedTimeRanges</key>",
                                                                                         "   <array>",
                                                                                         "     <dict>",
-                                                                                        "       <key>duration</key> <real>51.541130402</real>",
-                                                                                        "       <key>start</key> <real>18.118717650000001</real>",
+                                                                                        "       <key>duration</key>",
+                                                                                        "       <real>"+duration+"</real>",
+                                                                                        "       <key>start</key>",
+                                                                                        "       <real>0.0</real>",
                                                                                         "     </dict>",
                                                                                         "   </array>",
-                                                                                        "   <key>playbackBufferEmpty</key> <true/>",
-                                                                                        "   <key>playbackBufferFull</key> <false/>",
-                                                                                        "   <key>playbackLikelyToKeepUp</key> <true/>",
-                                                                                        position,
-                                                                                        rate,
-                                                                                        "   <key>readyToPlay</key> <true/>",
+                                                                                        "   <key>playbackBufferEmpty</key>",
+                                                                                        "   <true/>",
+                                                                                        "   <key>playbackBufferFull</key>",
+                                                                                        "   <false/>",
+                                                                                        "   <key>playbackLikelyToKeepUp</key>",
+                                                                                        "   <true/>",
+                                                                                        "   <key>position</key>",
+                                                                                        "   <real>"+position+".0</real>"
+                                                                                        "   <key>rate</key>",
+                                                                                        "   <real>" + f_rate + "</real>"
+                                                                                        "   <key>readyToPlay</key>"
+                                                                                        "   <true/>",
                                                                                         "   <key>seekableTimeRanges</key>",
                                                                                         "   <array>",
                                                                                         "     <dict>",
                                                                                         "       <key>duration</key>"
-                                                                                        "       <real>1801</real>",
+                                                                                        "       <real>" + duration + "</real>",
                                                                                         "       <key>start</key>",
                                                                                         "       <real>0.0</real>",
                                                                                         "     </dict>",
                                                                                         "   </array>",
                                                                                         " </dict>",
-                                                                                        "</plist>"]))
+                                                                                        "</plist>"])
+
+    print body
+    return send_http_reply(connection, "text/x-apple-plist+xml", body)
 
 End Function
 
@@ -245,18 +271,53 @@ Function handle_rate(http as Object, connection as Object)
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
+Function handle_get_property(http as Object, connection as Object)
+    print http.search
+    ' FIXME: not implemente
+    return send_http_reply(connection, "text/x-apple-plist+xml", "")
+End Function
+
+
+
 Function list_concat_with_newlines(chunks as Object)
     output = ""
     For Each chunk in chunks
-        output = output + chunk + chr(13) + chr(10)
+        output = output + chunk + chr(10)
     End For
     return output
 End Function
 
+Function pad_integer(source as Integer)
+    if source < 10 Then
+        return "0" + right(str(source), 1)
+    Else
+        return right(str(source), 2)
+    End If
+End Function
+
 Function send_http_reply(connection as Object, content_type as String, data as String)
     reply = createobject("roByteArray")
+    date = createobject("roDateTime")
+    months = ["placeholder"
+              "Jan"
+              "Feb"
+              "Mar"
+              "Apr"
+              "May"
+              "Jun"
+              "Jul"
+              "Aug"
+              "Sep"
+              "Oct"
+              "Nov"
+              "Dec"]
+    month_name = months[date.getMonth()]
+    ' WHY does str(6) return " 6" ?!
+    rfc822 = Left(date.GetWeekday(), 3) + ", " + pad_integer(date.GetDayOfMonth()) + " " + month_name + " " + right(str(date.getYear()), 4) + " " + pad_integer(date.getHours()) + ":" + pad_integer(date.getMinutes()) + ":" + pad_integer(date.getSeconds()) + " GMT"
+    print rfc822
     packet = "HTTP/1.1 200 OK" + chr(13) + chr(10)
-    packet = packet + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10)
+    packet = packet + "Date: " + rfc822 + chr(13) + chr(10)    
+    'packet = packet + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10)
     packet = packet + "Content-Type: " + content_type + chr(13) + chr(10)
     packet = packet + "Content-Length: " + str(len(data)) + chr(13) + chr(10) + chr(13) + chr(10)
     packet = packet + data
@@ -264,8 +325,8 @@ Function send_http_reply(connection as Object, content_type as String, data as S
     'print data
     status = connection.send(reply, 0, reply.Count())
     return status
-
 End Function
+
 
 Function dispatch_http(http as Object, connection as Object)
     print "Handling " ; http.path
@@ -289,6 +350,12 @@ Function dispatch_http(http as Object, connection as Object)
         status = handle_set_property(http, connection)
     Else If http.path = "/playback-info" Then
         status = handle_playback_info(http, connection)
+    Else If http.path = "/scrub" Then
+        status = handle_scrub(http, connection)
+    Else If http.path = "/fp-setup" Then
+        status = handle_fairplay(http, connection)
+    Else If http.path = "/getProperty" Then
+        status = handle_get_property(http, connection)
     Else
         print "Unexpected URI: "; http.path
     End If
