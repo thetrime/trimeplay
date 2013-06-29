@@ -20,6 +20,7 @@ What does not:
    * Starting videos in the right place (for reasons that are tremendously stupid)
    * Scrubbing videos
    * Slideshow transitions
+   * Music
 
 LICENSE:
 
