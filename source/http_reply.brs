@@ -73,6 +73,13 @@ Function handle_photo(http as Object, connection as Object)
     print http.body.WriteFile("tmp:/myphoto1.jpg")
     bitmap = CreateObject("roBitmap", "tmp:/myphoto1.jpg")
     print "About to draw image: " ; bitmap
+    if m.state = "none" Then
+        m.screen = createobject("roScreen")
+        m.screen.SetPort(m.port)
+    Else if m.state = "video" Then
+        m.screen.Close()
+    End If
+    m.state = "photo"
     m.screen.clear(0)
     x_offset = (m.screen.GetWidth() - bitmap.GetWidth())/2
     y_offset = (m.screen.GetHeight() - bitmap.GetHeight())/2
@@ -82,6 +89,12 @@ Function handle_photo(http as Object, connection as Object)
 End Function
 
 Function handle_stop(http as Object, connection as Object)
+    If m.state = "video" Then
+       m.screen.Close()
+    Else If m.state = "photo" Then
+       m.screen = invalid
+    End If
+    m.state = "none"
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
@@ -114,26 +127,123 @@ Function handle_play(http as Object, connection as Object)
             End If
         End For
     End If
+    if m.state = "none" Then
+        m.screen = createobject("roVideoScreen")
+        m.screen.SetPositionNotificationPeriod(1)
+        m.screen.SetMessagePort(m.port)
+    Else if m.state = "photo" Then
+        ' This is apparently the only way to close the roScreen :S (you had better hope it gets GCd!)
+        m.screen = invalid
+    End If
+    m.state = "video"
+
+    ' We need to get the length of the video
+    'duration = mp4_duration(params["content-location"])
+    duration = 1200
+    playstart = Int(duration * params["start-position"])
+    print "Starting at " ; playstart
     If params["content-location"] <> invalid Then
+       print "start-position: " ; params["start-position"]
        content = {}
+
        content.Stream = { url:params["content-location"]
-                      quality:false
-                    contentid:"airplay-content"}
+                             quality:false
+                           contentid:"airplay-content"
+                        streamformat:"mp4"
+                              length:1200
+                           PlayStart:50
+                        PlayDuration:30}
        content.StreamFormat = "mp4"
        m.screen.setContent(content)
        m.screen.show()
-       print "Here goes!"
+       m.video_paused = false       
     End If
-
-
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
 
+
+Function handle_set_property(http as Object, connection as Object)
+    params = {}
+    If http.headers["content-type"] = "application/x-apple-binary-plist"
+        ' Expected
+        params = parse_bplist(http.body)
+        For Each value in params
+            print value ; " = " ; params[value]
+        End For
+    else
+        stop
+    End If
+    return send_http_reply(connection, "text/x-apple-plist+xml", list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
+                                                                                            "<!DOCTYPE plist PUBLIC " + chr(34) + "-//Apple//DTD PLIST 1.0//EN" + chr(34) + " " + chr(34) + "http://www.apple.com/DTDs/PropertyList-1.0.dtd" + chr(34) + ">",
+                                                                                            "<plist version=" + chr(34) + "1.0" + chr(34) + ">",
+                                                                                            " <dict>",
+                                                                                            "   <key>errorCode</key>",
+                                                                                            "   <integer>0</integer>",
+                                                                                            " </dict>",
+                                                                                            "</plist>"]))
+End Function
+
+
+Function handle_playback_info(http as Object, connection as Object)
+    If m.video_paused Then    
+        rate = "    <key>rate</key> <real>0</real>"
+    Else
+        rate = "    <key>rate</key> <real>1</real>"
+    End If
+    position = "    <key>position</key><real>" + str(m.video_position) + "</real>"
+
+    return send_http_reply(connection, "text/x-apple-plist+xml", list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
+                                                                                        "<!DOCTYPE plist PUBLIC " + chr(34) + "-//Apple//DTD PLIST 1.0//EN" + chr(34) + " " + chr(34) + "http://www.apple.com/DTDs/PropertyList-1.0.dtd" + chr(34) + ">",
+                                                                                        "<plist version=" + chr(34) + "1.0" + chr(34) + ">",
+                                                                                        " <dict>",
+                                                                                        "   <key>duration</key> <real>1801</real>",
+                                                                                        "   <key>loadedTimeRanges</key>",
+                                                                                        "   <array>",
+                                                                                        "     <dict>",
+                                                                                        "       <key>duration</key> <real>51.541130402</real>",
+                                                                                        "       <key>start</key> <real>18.118717650000001</real>",
+                                                                                        "     </dict>",
+                                                                                        "   </array>",
+                                                                                        "   <key>playbackBufferEmpty</key> <true/>",
+                                                                                        "   <key>playbackBufferFull</key> <false/>",
+                                                                                        "   <key>playbackLikelyToKeepUp</key> <true/>",
+                                                                                        position,
+                                                                                        rate,
+                                                                                        "   <key>readyToPlay</key> <true/>",
+                                                                                        "   <key>seekableTimeRanges</key>",
+                                                                                        "   <array>",
+                                                                                        "     <dict>",
+                                                                                        "       <key>duration</key>"
+                                                                                        "       <real>1801</real>",
+                                                                                        "       <key>start</key>",
+                                                                                        "       <real>0.0</real>",
+                                                                                        "     </dict>",
+                                                                                        "   </array>",
+                                                                                        " </dict>",
+                                                                                        "</plist>"]))
+
+End Function
+
+
+Function handle_rate(http as Object, connection as Object)
+    print http.search["value"]
+    if val(http.search["value"]) = 0 Then
+       print "Pausing"
+       m.screen.Pause()
+    Else if val(http.search["value"]) = 1 Then
+       print "Resuming"
+       m.screen.Resume()
+    Else
+       print "unexpected rate:" ; http.search["value"]
+    End If
+    return send_http_reply(connection, "text/x-apple-plist+xml", "")
+End Function
+
 Function list_concat_with_newlines(chunks as Object)
     output = ""
     For Each chunk in chunks
-        output = output + chunk + chr(13)
+        output = output + chunk + chr(13) + chr(10)
     End For
     return output
 End Function
@@ -146,8 +256,10 @@ Function send_http_reply(connection as Object, content_type as String, data as S
     packet = packet + "Content-Length: " + str(len(data)) + chr(13) + chr(10) + chr(13) + chr(10)
     packet = packet + data
     reply.fromAsciiString(packet)
+    'print data
     status = connection.send(reply, 0, reply.Count())
     return status
+
 End Function
 
 Function dispatch_http(http as Object, connection as Object)
@@ -164,8 +276,14 @@ Function dispatch_http(http as Object, connection as Object)
         status = handle_stop(http, connection)
     Else If http.path = "/play" Then
         status = handle_play(http, connection)
+    Else If http.path = "/rate" Then
+        status = handle_rate(http, connection)
     Else If http.path = "/stream.xml" Then
         status = handle_stream(http, connection)
+    Else If http.path = "/setProperty" Then
+        status = handle_set_property(http, connection)
+    Else If http.path = "/playback-info" Then
+        status = handle_playback_info(http, connection)
     Else
         print "Unexpected URI: "; http.path
     End If

@@ -9,7 +9,7 @@ Function parse_bplist(raw as Object)
         magic.push(raw.Shift())
     End For
     If magic.toAsciiString() <> "bplist" Then
-       print magic.toAsciiString()
+       print "Unexpected magic: " ; magic.toAsciiString()
        stop
     End If
     major = raw.Shift() - 48
@@ -17,7 +17,7 @@ Function parse_bplist(raw as Object)
     For i = 1 to 32 Step 1
         trailer.Unshift(raw.Pop())        
     End For
-    print "offsetSize: " ; trailer[6]
+    'print "offsetSize: " ; trailer[6]
     offsetSize = parse_unsigned_int([trailer[6]])
     object_ref_size = parse_unsigned_int([trailer[7]])
     numObjects = parse_unsigned_int([trailer[8], trailer[9], trailer[10], trailer[11], trailer[12], trailer[13], trailer[14], trailer[15]])
@@ -30,21 +30,21 @@ Function parse_bplist(raw as Object)
             bytes.Push(raw[offsetTableOffset + i * offsetSize + j-8]) ' Account for already-shifted() data
         End For
         offset_table[i] = parse_unsigned_int(bytes)
-        print "Offset[";i;"] = "; offset_table[i]
+        'print "Offset[";i;"] = "; offset_table[i]
     End For
     return parse_object(topObject, offset_table, raw, object_ref_size)
 End Function
 
 
 Function parse_object(target as integer, offset_table as Object, raw as Object, object_ref_size as integer)
-    print "target: " ; target
+    'print "target: " ; target
     offset = offset_table[target]
-    print "offset: " ; offset
+    'print "offset: " ; offset
     data = raw[offset-8]
-    print "data: " ; data
+    'print "data: " ; data
     object_type = (data and 240) / 16
     object_info = (data and 15)
-    print object_type ; " / " object_info
+    'print object_type ; " / " object_info
     If object_type = 0 Then
        If object_info = 0 Then
           return invalid
@@ -65,11 +65,38 @@ Function parse_object(target as integer, offset_table as Object, raw as Object, 
           ' filler
           return invalid
        End If
-    'Else If object_type = 1 Then
-    Else If object_type = 2 Then
-        ' Real
+    Else If object_type = 1 Then
+        ' Integer
         length = 2 ^ object_info
         return val(sub_array(raw, offset + 1 - 8, offset + 1 + length - 8).toAsciiString())
+    Else If object_type = 2 Then
+        ' Real
+        ' Good grief. This is either going to be an IEEE754 single or double (or worse?)
+        ' I am going to have to decode this myself T_T
+        length = 2 ^ object_info
+        if length = 4 then
+            sign = (raw[offset+1-8] and 128) = 128
+            exponent = (raw[offset+1-8] and 127) * 2 or ((raw[offset+2-8] and 128) / 128) - 127
+            significand = 8388608 or (raw[offset+2-8] and 127) * 65536 or raw[offset+3-8] * 256 or raw[offset+4-8]
+            mask = 8388608
+            factor = 1
+            decoded = 0
+            For i = 0 to 23
+                if (significand and mask) = mask then
+                    decoded = decoded + factor
+                end if
+                factor = factor / 2
+                mask = mask / 2
+            End For
+            if sign Then
+               return (2^exponent) * (-decoded)
+            Else
+               return (2^exponent) * decoded
+            End If
+        else
+            print "Double-precision IE7544 decoding not implemented"
+            stop   
+        end if
     'Else If object_type = 3 Then
     'Else If object_type = 4 Then
     Else If object_type = 5 Then
@@ -86,17 +113,18 @@ Function parse_object(target as integer, offset_table as Object, raw as Object, 
         dictionary = {}
         dictionary_info = read_length_and_offset(object_info, offset, raw)
         for i = 0 to dictionary_info.length - 1
-            print "Key is from " ; (offset + dictionary_info.offset + i * object_ref_size -8) ; " to " ; (offset + dictionary_info.offset + (i + 1) * object_ref_size - 8)
+            'print "Key is from " ; (offset + dictionary_info.offset + i * object_ref_size -8) ; " to " ; (offset + dictionary_info.offset + (i + 1) * object_ref_size - 8)
             key_ref = parse_unsigned_int(sub_array(raw, offset + dictionary_info.offset + i * object_ref_size -8, offset + dictionary_info.offset + (i + 1) * object_ref_size - 8))
             value_ref = parse_unsigned_int(sub_array(raw, offset + dictionary_info.offset + (dictionary_info.length * object_ref_size) + i * object_ref_size - 8, offset + dictionary_info.offset + (dictionary_info.length * object_ref_size) + (i + 1) * object_ref_size - 8))
              key = parse_object(key_ref, offset_table, raw, object_ref_size)
-             print "key: " ; key
+             'print "key: (" ; key ; ")"
              value = parse_object(value_ref, offset_table, raw, object_ref_size)
-             print "Value: " ; value
+             'print "Value: (" ; value ; ")"
              dictionary[key] = value
         End For
         return dictionary
     Else
+        print "Unhandled type " ; object_type
         stop
     End If
 End Function
@@ -123,21 +151,16 @@ Function read_length_and_offset(object_info as integer, offset as integer, raw a
     stroffset = 1
     if object_info = 15 Then
        int_type = raw[offset + 1 - 8]
-       print "int_type: " ; int_type
        int_type = (int_type and 240) / 16
        int_info = (raw[offset + 1 - 8] and 15)
-       print "int_info:" ; int_info
        int_length = 2 ^ int_info
        stroffset = 2 + int_length
-       print "stroff: " ; stroffset
        bytes = createobject("roByteArray")
        For i = offset + 2 to offset + 2 + int_length-1 step 1
-           print "Accepting byte " ; (i-8) ; " = " raw[i-8]
            bytes.push(raw[i-8])
        End For       
        length = parse_unsigned_int(bytes)
     End If
-    print "length: " ; length ; " stroff: " ; stroffset
     return {length: length
             offset: stroffset}
 End Function

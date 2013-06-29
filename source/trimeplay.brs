@@ -3,10 +3,13 @@ Function Main()
     m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
     m.features = "3" '0x93
     'm.features = "0x39f7"
-    'm.screen = createobject("roScreen")         
-    'm.screen.SetPort(msgPort)
-    m.screen = createobject("roVideoScreen")         
-    m.screen.SetMessagePort(msgPort)
+
+    ' Set up some stuff so we can display screens later in the http handlers
+    m.port = msgPort
+    m.state = "none"
+    m.video_paused = true
+    m.video_position = 0
+
     m.reversals = {}
     connections = {}
     http_requests = {}
@@ -60,10 +63,10 @@ Function Main()
     result = udp.send(announce, 0, announce.Count())
     udp.notifyReadable(true) 
     While true
-        print "Waiting in main loop"
+        'print "Waiting in main loop"
         event = wait(0, msgPort)
         If type(event)="roSocketEvent"
-            print "Got event on " ; event.getSocketID()
+            'print "Got event on " ; event.getSocketID()
             If event.getSocketID() = udp.getID()
                 If udp.isReadable()
                    message = createobject("roByteArray")
@@ -73,7 +76,7 @@ Function Main()
                    message[size] = invalid
                    udp.receive(message, 0, size)
                    from = udp.getReceivedFromAddress()
-                   print "Received message of length " ; str(size) ; " from " ; from.getAddress()
+                   'print "Received message of length " ; str(size) ; " from " ; from.getAddress()
                    dns = parse_dns(message)
                    respond_to_dns(dns, udp)
                 End If
@@ -96,11 +99,11 @@ Function Main()
                      client.setMessagePort(msgPort)
                      connections[Stri(client.getID())] = client
                 End If
-
             Else
                 ' Must be a client connection!
                 connection = connections[Stri(event.getSocketID())]
-                If connection.isReadable()
+                ' If connection is invalid, what does that mean?
+                if connection <> invalid and connection.isReadable()
                     if connection.getCountRcvBuf() = 0 Then
                         ' Apparently this means the connection has been closed
                         ' What a terrible way to indicate it
@@ -111,7 +114,27 @@ Function Main()
                     End If
                 End If
             End If
-         End If
+        Else If type(event)="roVideoScreenEvent" Then
+            if event.isStreamStarted()
+               print "isStarted"
+               if m.video_paused then
+                   m.screen.Pause()
+               end if
+               m.video_position = event.GetIndex()
+            else if event.isPlaybackPosition()
+               print "isPlaybackPosition"
+               m.video_position = event.GetIndex()
+            else if event.isPaused()
+               print "isPaused"
+               m.video_paused = true
+            else if event.isResumed()
+               print "isResumed"
+               m.video_paused = false            
+            End If
+            print "Position is now "; m.video_position 
+        Else
+            print "Unexpected event: " ; type(event)
+        End If
     End While
     udp.close()
 End Function
@@ -122,7 +145,7 @@ Sub handle_tcp(connection as Object, http_requests as Object)
     If m.reversals[Stri(connection.getID())] = invalid Then
         request = http_requests[Stri(connection.getID())]
         If request = invalid Then
-           print "New request on socket"
+           'print "New request on socket"
            request = create_new_request()
            http_requests[Stri(connection.getID())] = request
         End If
@@ -143,7 +166,7 @@ Sub respond_to_dns(dns as Object, udp as Object)
         For Each part in question
             uri = uri + part + "."
         End For
-        print "Query received for " ; uri
+        'print "Query received for " ; uri
         If uri = "_raop._tcp.local." or uri = "._airplay." or uri = "_services._dns-sd._udp.local." Then
             announce = announce_packet()
             result = udp.send(announce, 0, announce.Count())
