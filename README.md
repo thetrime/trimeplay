@@ -19,7 +19,7 @@ What does not:
       * That includes mirroring, surprisingly!
    * Starting videos in the right place (for reasons that are tremendously stupid)
    * Scrubbing videos
-
+   * Slideshow transitions
 
 LICENSE:
 
