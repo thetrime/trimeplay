@@ -165,7 +165,7 @@ Function parse_http_method(connection as Object, request as Object)
             parse_http_path(connection, request)
             Exit While
         End If
-        request.method = request.method + Lcase(str(code))
+        request.method = request.method + Lcase(chr(code))
     End While
 End Function
 

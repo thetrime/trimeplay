@@ -1,4 +1,5 @@
 Function handle_fairplay(http as Object, connection as Object)
+    reply = createobject("roByteArray")
     packet = "HTTP/1.1 404 Not Found" + chr(13) + chr(10)
     reply.fromAsciiString(packet)
     status = connection.send(reply, 0, reply.Count())
@@ -12,6 +13,7 @@ Function handle_reverse(http as Object, connection as Object)
     status = connection.send(reply, 0, reply.Count())
     print "Reversal: " ; connection.getID()
     m.reversals[Stri(connection.getID())] = connection
+    m.current_connection = connection
     return status
 End Function
 
@@ -113,7 +115,16 @@ End Function
 
 Function handle_scrub(http as Object, connection as Object)
     duration = 1200 ' FIXME: No it isnt
-    return send_http_reply(connection, "text/parameters", list_concat_with_newlines(["duration: " + str(duration), "position: " + str(m.video_position)]))
+    print "Method: " ; http.method
+    if http.method = "get" then
+        return send_http_reply(connection, "text/parameters", list_concat_with_newlines(["duration: " + str(duration), "position: " + str(m.video_position)]))
+    else if http.method = "post" then
+        ' Scrub to given position
+        new_position = val(http.search["position"]) * 1000        
+        print "Scrubbing to " ; new_position
+        m.video_screen.Seek(Int(new_position))
+        return send_http_reply(connection, "text/parameters", "")
+    end if
 End Function
 
 
@@ -126,14 +137,12 @@ Function handle_play(http as Object, connection as Object)
         params = parse_bplist(http.body)
     Else
         For Each byte in http.body
-            print byte
             If byte = 58 and state = 0 Then
                 value = createobject("roByteArray")
                 state = 2
             Else if byte = 10 and state = 1 Then
                ' End of record
                params[Lcase(name.toAsciiString())] = value.toAsciiString()
-               print "Got:"; Lcase(name.toAsciiString()) ; "=" ; value.toAsciiString()
                name = createobject("roByteArray")
                state = 0
             Else if state = 2 and byte <> 32 Then
@@ -210,7 +219,7 @@ Function handle_playback_info(http as Object, connection as Object)
     Else
         f_rate = "1"
     End If
-    duration = "1200.0" 'FIXME: No it isnt
+    duration = "1451.000000" 'FIXME: No it isnt
     position = str(m.video_position) ' FIXME: trim spaces?
     body= list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
                                                                                         "<!DOCTYPE plist PUBLIC " + chr(34) + "-//Apple//DTD PLIST 1.0//EN" + chr(34) + " " + chr(34) + "http://www.apple.com/DTDs/PropertyList-1.0.dtd" + chr(34) + ">",
@@ -251,7 +260,6 @@ Function handle_playback_info(http as Object, connection as Object)
                                                                                         " </dict>",
                                                                                         "</plist>"])
 
-    print body
     return send_http_reply(connection, "text/x-apple-plist+xml", body)
 
 End Function
@@ -314,7 +322,6 @@ Function send_http_reply(connection as Object, content_type as String, data as S
     month_name = months[date.getMonth()]
     ' WHY does str(6) return " 6" ?!
     rfc822 = Left(date.GetWeekday(), 3) + ", " + pad_integer(date.GetDayOfMonth()) + " " + month_name + " " + right(str(date.getYear()), 4) + " " + pad_integer(date.getHours()) + ":" + pad_integer(date.getMinutes()) + ":" + pad_integer(date.getSeconds()) + " GMT"
-    print rfc822
     packet = "HTTP/1.1 200 OK" + chr(13) + chr(10)
     packet = packet + "Date: " + rfc822 + chr(13) + chr(10)    
     'packet = packet + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10)
@@ -329,7 +336,9 @@ End Function
 
 
 Function dispatch_http(http as Object, connection as Object)
-    print "Handling " ; http.path
+    if http.path <> "/playback-info" 
+         print "Handling " ; http.path
+    end if
     If http.path = "/reverse" Then
         status = handle_reverse(http, connection)
     Else If http.path = "/server-info" Then
@@ -359,5 +368,5 @@ Function dispatch_http(http as Object, connection as Object)
     Else
         print "Unexpected URI: "; http.path
     End If
-    print "Status: " ; status
+    'print "Status: " ; status
 End Function

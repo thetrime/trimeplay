@@ -25,6 +25,7 @@ Function Main()
     default_screen.show()
 
     m.reversals = {}
+    http_replies = {}
     connections = {}
     http_requests = {}
     udp = createobject("roDatagramSocket")
@@ -124,7 +125,7 @@ Function Main()
                         connection.close()
                         connections[Stri(event.getSocketID())] = invalid
                     Else
-                        handle_tcp(connection, http_requests)
+                        handle_tcp(connection, http_requests, http_replies)
                     End If
                 End If
             End If
@@ -133,16 +134,17 @@ Function Main()
                print "isStarted"
                if m.video_paused then
                    m.video_screen.Pause()
-               end if
+                   send_event("state", "paused")
+               end if               
                m.video_position = event.GetIndex()
             else if event.isPlaybackPosition()
                print "isPlaybackPosition"
                m.video_position = event.GetIndex()
             else if event.isPaused()
-               print "isPaused"
+               send_event("state", "paused")
                m.video_paused = true
             else if event.isResumed()
-               print "isResumed"
+               send_event("state", "playing")
                m.video_paused = false            
             End If
             print "Position is now "; m.video_position 
@@ -154,8 +156,7 @@ Function Main()
 End Function
 
 
-Sub handle_tcp(connection as Object, http_requests as Object)
-    ' Ignore anything which is doing reverse HTTP
+Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Object)
     If m.reversals[Stri(connection.getID())] = invalid Then
         request = http_requests[Stri(connection.getID())]
         If request = invalid Then
@@ -170,7 +171,22 @@ Sub handle_tcp(connection as Object, http_requests as Object)
             http_requests[Stri(connection.GetID())] = invalid
         end if
     Else
-        print "Reversal action"
+        ' Data arriving on reverse connection
+        if connection.getCountRcvBuf() = 0 Then
+            connection.close()
+            m.reversals[Stri(connection.getID())] = invalid
+        else
+            reply = http_replies[Stri(connection.getID())]
+            if reply = invalid Then
+                reply = create_new_reply()
+            end if
+            is_complete = read_http_reply(connection, reply)
+            if is_complete then
+                print "Got reply. Status was " ; reply.status
+                read_http_reply(connection, reply)
+                http_replies[Stri(connection.getID())] = invalid
+            End if
+        end if
     End If
 End Sub
 
