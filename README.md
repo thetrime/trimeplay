@@ -13,13 +13,14 @@ Things that work:
    * Viewing videos from third parties, such as youtube (Again, only without DRM)
    * Pausing and resuming video
    * Stopping videos
+   * Scrubbing videos (although this is still slightly buggy)
 
 What does not:
    * Anything with DRM
       * That includes mirroring, surprisingly!
    * Starting videos in the right place (for reasons that are tremendously stupid)
-   * Scrubbing videos
    * Slideshow transitions
+   * Sometimes the airplay capability disappears from the network. Not sure why (yet)
    * Music
 
 LICENSE:
