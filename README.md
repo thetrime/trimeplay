@@ -3,10 +3,10 @@ trimeplay
 
 Airplay server for Roku.
 
-Very experimental at this stage. 
+Somewhat experimental at this stage. Probably usable if you're willing to ignore a few problems
 
 Things that work:
-   * Viewing photos (although they don't appear to look very good. I think there's an off-by-one error in the transfer somewhere)
+   * Viewing photos
    * Changing the photo you are looking at
    * Stopping photo viewing
    * Viewing videos from the Video app. Only ones without DRM!
@@ -23,7 +23,8 @@ What does not (because either it never will or I have no interest in doing it)
 
 What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
-
+   * Photos look ugly (wrong colour, wrong origin) sometimes. I think this is an off-by-one error in transfer
+   * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
 
 LICENSE:
 
