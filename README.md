@@ -23,6 +23,7 @@ What does not (because either it never will or I have no interest in doing it)
 
 What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
+   * Sockets are not correctly cleaned up. See the fixme in trimeplay.brs
    * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
 
 LICENSE:
