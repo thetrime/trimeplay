@@ -53,12 +53,9 @@ Function handle_mp4_data(connection as Object, request as Object)
         print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
         content.Stream = { url:m.current_video_url
                        quality:false
-                     contentid:"airplay-content"
-                  streamformat:"mp4"
-                        length:m.video_duration
-                     PlayStart:play_start
-         StreamStartTimeOffset:play_start
-                  PlayDuration:m.video_duration}
+                     contentid:"airplay-content"}
+        content.length = int(m.video_duration)
+        content.playstart = play_start
         content.StreamFormat = "mp4"
         m.video_screen.setContent(content)
         m.video_paused = false       
