@@ -134,6 +134,9 @@ Function Main()
                 End If
             End If
         Else If type(event)="roVideoScreenEvent" Then
+            if not event.isPlaybackPosition() then
+                print "Video screen event"
+            end if
             if event.isStreamStarted()
                print "isStarted"
                if m.video_paused then
@@ -145,9 +148,11 @@ Function Main()
                print "isPlaybackPosition"
                m.video_position = event.GetIndex()
             else if event.isPaused()
+               print "isPaused"
                send_event("state", "paused")
                m.video_paused = true
             else if event.isResumed()
+               print "isResumed"
                send_event("state", "playing")
                m.video_paused = false            
             End If

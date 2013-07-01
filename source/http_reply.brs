@@ -173,7 +173,6 @@ Function handle_play(http as Object, connection as Object)
     m.current_video_fraction = params["start-position"]
     url = parse_url(params["content-location"])
     load_video_parameters(url.hostname, url.port, url.path)
-    m.video_paused = false       
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
@@ -258,9 +257,11 @@ Function handle_rate(http as Object, connection as Object)
     if val(http.search["value"]) = 0 Then
        print "Pausing"
        m.video_screen.Pause()
+       m.video_paused = true
     Else if val(http.search["value"]) = 1 Then
        print "Resuming"
        m.video_screen.Resume()
+       m.video_paused = false
     Else
        print "unexpected rate:" ; http.search["value"]
     End If

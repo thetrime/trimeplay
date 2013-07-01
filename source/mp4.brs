@@ -58,7 +58,10 @@ Function handle_mp4_data(connection as Object, request as Object)
         content.playstart = play_start
         content.StreamFormat = "mp4"
         m.video_screen.setContent(content)
-        m.video_paused = false       
+        print "Video is created. video_paused is "; m.video_paused
+        if m.video_paused then
+            m.video_screen.Pause()
+        end if
     else
         ' Oh well. Skip this atom        
         new_start = add_strings(request.start_range, atom_length)
