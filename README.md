@@ -14,16 +14,18 @@ Things that work:
    * Viewing videos from third parties, such as youtube (Again, only without DRM)
    * Pausing and resuming video
    * Stopping videos
-   * Scrubbing videos (although this is still slightly buggy)
 
-What does not:
+What does not (because either it never will or I have no interest in doing it)
    * Anything with DRM
-      * That includes mirroring, surprisingly!
-   * Slideshow transitions
+      * That includes mirroring, surprisingly! That's a shame really: I might try and get mirroring off the never-to-be-done list, but it seems unlikely to happen :(
+   * Slideshow transitions (Don't care)
+   * Music (not really interested. The protocol is very complicated, which is surprising given how simple video is?)
+
+What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
    * For some reason the video does not always track correctly on the iDevice. That is, sometimes it doesn't show the video playing when it is (the position does not increase) and play/pause does not start in the right state.
       * Scrubbing fixes this though. It is just the INITIAL state that is wrong.
-   * Music
+
 
 LICENSE:
 
