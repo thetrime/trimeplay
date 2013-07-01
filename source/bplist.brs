@@ -120,7 +120,7 @@ Function parse_object(target as integer, offset_table as Object, raw as Object, 
              'print "key: (" ; key ; ")"
              value = parse_object(value_ref, offset_table, raw, object_ref_size)
              'print "Value: (" ; value ; ")"
-             dictionary[key] = value
+             dictionary[Lcase(key)] = value
         End For
         return dictionary
     Else

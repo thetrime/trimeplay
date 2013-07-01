@@ -3,8 +3,8 @@ Function Main()
     m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
     m.features = "3"
     'm.features = "0x39f7"
-
     ' Set up some stuff so we can display screens later in the http handlers
+
     m.port = msgPort
     m.state = "none"
     m.video_paused = true
@@ -26,7 +26,8 @@ Function Main()
 
     m.reversals = {}
     http_replies = {}
-    connections = {}
+    m.mp4_connections = {}
+    m.connections = {}
     http_requests = {}
     udp = createobject("roDatagramSocket")
     udp.setMessagePort(msgPort)
@@ -102,7 +103,7 @@ Function Main()
                  Else
                      client.notifyReadable(true)
                      client.setMessagePort(msgPort)
-                     connections[Stri(client.getID())] = client
+                     m.connections[Stri(client.getID())] = client
                 End If
             Else if event.getSocketID() = mirror.getID()
                  print "MIRRORING"
@@ -112,21 +113,24 @@ Function Main()
                  Else
                      client.notifyReadable(true)
                      client.setMessagePort(msgPort)
-                     connections[Stri(client.getID())] = client
+                     m.connections[Stri(client.getID())] = client
                 End If
             Else
                 ' Must be a client connection!
-                connection = connections[Stri(event.getSocketID())]
+                connection = m.connections[Stri(event.getSocketID())]
                 ' If connection is invalid, what does that mean?
-                if connection <> invalid and connection.isReadable()
-                    if connection.getCountRcvBuf() = 0 Then
+                if connection <> invalid
+                    if connection.isReadable() and connection.getCountRcvBuf() = 0 and not connection.isWritable() Then
                         ' Apparently this means the connection has been closed
                         ' What a terrible way to indicate it
+                        print "Connection is closed"
                         connection.close()
-                        connections[Stri(event.getSocketID())] = invalid
+                        m.connections[Stri(event.getSocketID())] = invalid
                     Else
                         handle_tcp(connection, http_requests, http_replies)
                     End If
+                else 
+                    print "Invalid connection"
                 End If
             End If
         Else If type(event)="roVideoScreenEvent" Then
@@ -157,20 +161,7 @@ End Function
 
 
 Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Object)
-    If m.reversals[Stri(connection.getID())] = invalid Then
-        request = http_requests[Stri(connection.getID())]
-        If request = invalid Then
-           'print "New request on socket"
-           request = create_new_request()
-           http_requests[Stri(connection.getID())] = request
-        End If
-        is_complete = read_http(connection, request)
-        If is_complete Then
-            dispatch_http(request, connection)
-            ' Mark as finished
-            http_requests[Stri(connection.GetID())] = invalid
-        end if
-    Else
+    If m.reversals[Stri(connection.getID())] <> invalid Then
         ' Data arriving on reverse connection
         if connection.getCountRcvBuf() = 0 Then
             connection.close()
@@ -186,6 +177,30 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
                 read_http_reply(connection, reply)
                 http_replies[Stri(connection.getID())] = invalid
             End if
+        end if
+    Else if m.mp4_connections[Stri(connection.getID())] <> invalid Then
+        request = m.mp4_connections[Stri(connection.getID())]
+        if request.state = -1 then
+            print "Sending mp4 request"
+            send_mp4_request(connection, request.path, "0", "1024")
+        else
+            is_complete = read_http_reply(connection, request)
+            if is_complete then
+                handle_mp4_data(connection, request)
+            end if
+        end if
+    Else
+        request = http_requests[Stri(connection.getID())]
+        If request = invalid Then
+           'print "New request on socket"
+           request = create_new_request()
+           http_requests[Stri(connection.getID())] = request
+        End If
+        is_complete = read_http(connection, request)
+        If is_complete Then
+            dispatch_http(request, connection)
+            ' Mark as finished
+            http_requests[Stri(connection.GetID())] = invalid
         end if
     End If
 End Sub
@@ -532,3 +547,121 @@ Sub encode_qname(announce as Object, items as Object)
     End For
     announce.Push(0) ' End of qname
 End Sub
+
+
+Sub load_video_parameters(hostname as String, port as integer, path as String)
+    socket = createobject("roStreamSocket")
+    socket.setMessagePort(m.port)
+    mp4_addr = CreateObject("roSocketAddress")
+    mp4_addr.setPort(port)
+    mp4_addr.setHostName(hostname)      
+    request = create_new_request()
+    m.mp4_connections[Stri(socket.getID())] = request
+    m.mp4_connections[Stri(socket.getID())].state = -1 ' unconnected
+    m.connections[Stri(socket.getID())] = socket
+    request.path = path
+    socket.setSendToAddress(mp4_addr)
+    socket.notifyReadable(true)
+    socket.notifyWritable(true)
+    print "Connecting to get mp4 data on " ; socket.getID()
+    socket.connect()
+    'send_mp4_request(socket, path, 0, 1024)
+End Sub
+
+' We have to keep the ranges as strings, since brightscript will coerce them to floats, and print them out in scientific notation
+' which iOS does not care for. Worse, because we lose precision, we cannot reliably get it back
+' add_strings() below adds two strings
+Sub send_mp4_request(socket as Object, path as string, start_range as string, end_range as string)    
+    reply = create_new_reply()
+    m.mp4_connections[Stri(socket.getID())] = reply
+    reply.start_range = start_range
+    reply.path = path
+    packet = createobject("roByteArray")
+
+    packet.fromAsciiString("GET " + path + " HTTP/1.1" + chr(13) + chr(10) + "Range: bytes=" + start_range +"-" + end_range + chr(13) + chr(10) + chr(13) + chr(10))
+    print packet.toAsciiString()
+    print socket.send(packet, 0, packet.Count())
+End Sub
+
+Function add_strings(a as String, b as String)
+    carry = 0
+    ' we want A to be longer than B. If B is longer than A, swap them
+    aa = createobject("roByteArray")
+    bb = createobject("roByteArray")
+    c = createobject("roByteArray")
+    if len(b) > len(a) then
+        aa.fromAsciiString(b)
+        bb.fromAsciiString(a)
+    else
+        aa.fromAsciiString(a)
+        bb.fromAsciiString(b)
+    End If    
+    While aa.count() > 0
+        aaa = aa.pop() - 48
+        if bb.count() > 0 then
+            bbb = bb.pop() - 48
+        else
+            bbb = 0
+        end if
+        sum = aaa + bbb + carry
+        carry = int(sum / 10)
+        sum = sum MOD 10
+        c.UnShift(sum + 48)
+    End While
+    if carry <> 0 then
+        c.UnShift(carry + 48)
+    end if
+    ' trim leading zeroes
+    while c[0] = 48
+        c.shift()
+    end while
+    return c.toAsciiString()
+End Function
+
+Function multiply_string(a as String, b as String)
+    carry = 0
+    ' we want A to be longer than B. If B is longer than A, swap them
+    aa = createobject("roByteArray")
+    bb = createobject("roByteArray")
+    products = []
+    if len(b) > len(a) then
+        aa.fromAsciiString(b)
+        bb.fromAsciiString(a)
+    else
+        aa.fromAsciiString(a)
+        bb.fromAsciiString(b)
+    End If
+    i = 0
+    For k = bb.count()-1 to 0 step - 1
+       c = createobject("roByteArray")
+       bbb = bb[k] - 48
+       For j = 1 to i step 1
+          ' Put i 0s into the product
+          c.UnShift(48)
+       End For
+       ' Muliply all of aa by bbb
+       For j = aa.count()-1 to 0 step -1
+          aaa = aa[j] - 48
+          product = aaa * bbb + carry
+          carry = int(product / 10)
+          c.UnShift((product MOD 10) + 48)
+       End For
+       if carry <> 0 then
+           c.UnShift(carry+48)
+       end if
+       products.push(c.toAsciiString())
+       i = i + 1
+       carry = 0
+    End For
+    ' Now sum them all up
+    result = "0"
+    For each product in products
+        result = add_strings(result, product)
+    End For
+    return result
+End Function
+
+Function add_byte(a as String, b as Integer)
+    f = multiply_string(a, "256")
+    return add_strings(f, b.toStr())
+End Function 

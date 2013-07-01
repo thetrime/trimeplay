@@ -134,6 +134,7 @@ Function handle_play(http as Object, connection as Object)
     state = 0
     if http.headers["content-type"] = "application/x-apple-binary-plist"
         ' Blast.
+        print "is bplist"
         params = parse_bplist(http.body)
     Else
         For Each byte in http.body
@@ -166,26 +167,13 @@ Function handle_play(http as Object, connection as Object)
     End If
     m.state = "video"
 
-    ' We need to get the length of the video
-    'duration = mp4_duration(params["content-location"])
-    duration = 1200
-    playstart = Int(duration * params["start-position"])
-    print "Starting at " ; playstart
-    If params["content-location"] <> invalid Then
-       print "start-position: " ; params["start-position"]
-       content = {}
-
-       content.Stream = { url:params["content-location"]
-                             quality:false
-                           contentid:"airplay-content"
-                        streamformat:"mp4"
-                              length:1200
-                           PlayStart:50
-                        PlayDuration:30}
-       content.StreamFormat = "mp4"
-       m.video_screen.setContent(content)
-       m.video_paused = false       
-    End If
+    ' We need to get the length of the video. This is incredibly difficult, despite the fact that the Roku KNOWS it
+    ' There is apparently a request to provide this in the future. But tomorrow is always a day away...
+    m.current_video_url = params["content-location"]   
+    m.current_video_fraction = params["start-position"]
+    url = parse_url(params["content-location"])
+    load_video_parameters(url.hostname, url.port, url.path)
+    m.video_paused = false       
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 

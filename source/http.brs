@@ -209,6 +209,44 @@ Sub munge_search(request as Object)
     End If
 End Sub
 
+Function parse_url(s as string)
+    url = { path: "/"
+        hostname: ""
+            port: 0
+        protocol: ""}
+    bytes = createobject("roByteArray")
+    bytes.fromAsciiString(s)
+    state = 0
+    For each byte in bytes
+        if state = 0 then
+           if byte = 58 then
+              state = 1
+           else
+              url.protocol = url.protocol + chr(byte)
+           end if
+        else if state = 1 then '/
+            state = 2
+        else if state = 2 then '/
+            state = 3
+        else if state = 3 then
+            if byte = 58 then
+                state = 4
+            else
+                url.hostname = url.hostname + chr(byte)
+            end if
+        else if state = 4 then
+            if byte = 47 then
+                state = 5
+            else
+                url.port = 10 * url.port + val(chr(byte))
+            end if
+        else if state = 5 then
+            url.path = url.path + chr(byte)           
+        end if
+    End For
+    return url
+End Function
+
 'We have a central loop that JUST read http requests
 'We have a list of (socket,request) pairs. Only once a request has been fully read do we actually dispatch it
 'Until then, each time a socket is ready for reading, tell the request-parser to read some more data from the socket
@@ -221,3 +259,4 @@ End Sub
 '5) Header value
 '6) Data
 'This might make streaming video difficult, of course :(
+
