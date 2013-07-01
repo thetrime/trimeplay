@@ -23,8 +23,6 @@ What does not (because either it never will or I have no interest in doing it)
 
 What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
-   * For some reason the video does not always track correctly on the iDevice. That is, sometimes it doesn't show the video playing when it is (the position does not increase) and play/pause does not start in the right state.
-      * Scrubbing fixes this though. It is just the INITIAL state that is wrong.
 
 
 LICENSE:

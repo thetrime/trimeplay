@@ -1,3 +1,19 @@
+' trimePlay
+' This was written in less than a week after I decided I would really like to view photos from my recent holiday on my TV
+' So don't expect that much ;)
+
+' The key to understanding this nightmare of spaghetti is as follows:
+' Brightscript is single-threaded. Therefore nothing may block
+' Everything is a finite state machine. When data arrives on a socket then we look up the FSM for that socket, and call
+' appropriate function to parse from (or write) to the socket.
+' There are 4 kinds of these machines:
+'   * UDP messages, which handle mDNS to announce the roku on the network. Handled in mdns.brs
+'   * HTTP connections *from* the iDevice. These are like POST /play and GET /scrub. handled in http_reply.brs
+'   * HTTP connection replies to messages sent via the reverse HTTP (typically these are not very interesting, but must be handled)
+'   * HTTP connection replies to MP4 data requests. These are more interesting, and are handled in mp4.brs
+
+
+
 Function Main()
     msgPort = createobject("roMessagePort") 
     m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
@@ -41,7 +57,7 @@ Function Main()
     result = udp.joinGroup(group)
     udp.setMulticastLoop(false)
 
-    ' Set up the advertised TCP socket
+    ' Set up the about-to-be-advertised TCP socket
     tcp = createobject("roStreamSocket")
     tcp.setMessagePort(msgPort)
     tcp_bind_addr = CreateObject("roSocketAddress")
@@ -54,7 +70,7 @@ Function Main()
         stop
     end if
 
-    ' Set up the unadvertised mirroring TCP socket
+    ' Set up the unadvertised mirroring TCP socket just for fun
     mirror = createobject("roStreamSocket")
     mirror.setMessagePort(msgPort)
     mirror_bind_addr = CreateObject("roSocketAddress")
@@ -68,7 +84,7 @@ Function Main()
     end if
 
 
-    ' Need to broadcast that we are an Apple TV, rather than just waiting to be polled
+    ' Need to broadcast that we are an Apple TV, rather than just waiting to be polled. Sometimes this helps
     udp.setBroadcast(true)
     addr = createobject("roSocketAddress")
     addr.setPort(5353)
@@ -148,7 +164,7 @@ Function Main()
                send_event("state", "playing")
                m.video_state = 1 ' playing
             End If
-            print "Position is now "; m.video_position 
+            'print "Position is now "; m.video_position 
         Else
             print "Unexpected event: " ; type(event)
         End If
@@ -176,6 +192,7 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
             End if
         end if
     Else if m.mp4_connections[Stri(connection.getID())] <> invalid Then
+        ' A response to an MP4 data request
         request = m.mp4_connections[Stri(connection.getID())]
         if request.state = -1 then
             print "Sending mp4 request"
@@ -187,6 +204,7 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
             end if
         end if
     Else
+        ' A request from the iDevice
         request = http_requests[Stri(connection.getID())]
         If request = invalid Then
            'print "New request on socket"
@@ -200,349 +218,6 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
             http_requests[Stri(connection.GetID())] = invalid
         end if
     End If
-End Sub
-
-Sub respond_to_dns(dns as Object, udp as Object)
-    For Each question in dns["questions"]
-        uri = ""
-        For Each part in question
-            uri = uri + part + "."
-        End For
-        'print "Query received for " ; uri
-        If uri = "_raop._tcp.local." or uri = "._airplay." or uri = "_services._dns-sd._udp.local." Then
-            announce = announce_packet()
-            result = udp.send(announce, 0, announce.Count())
-        End If
-    End For
-End Sub
-
-Function parse_question(message as Object, questions as Object, history as Object, n as integer)
-    parts = []
-    length = message.Shift()
-    n = n + 1
-    While length <> 0
-        part = ""
-        If length = 192
-           ' This is a pointer-type record, which is horrifically difficult for me to parse
-           offset = message.Shift() ' FIXME: Does not take into account low-15 bytes of first byte
-           n = n + 1
-           For i = offset To history.count() Step 1
-               If history[i] = "" 
-                  Exit For
-               End If
-               If history[i] <> invalid
-                  parts.push(history[i])
-               End If
-           End For
-           Exit While
-        Else
-            For i = 1 To length
-                part = part + chr(message.Shift())
-            End For
-        End If
-        parts.push(part)
-        history[n] = part
-        length = message.Shift()
-        n = n + 1
-    End While
-    history[n] = ""
-
-    record_type = message.Shift() * 256 + message.Shift()
-    class = message.Shift() * 256 + message.Shift()
-    n = n + 4
-    questions.push(parts)
-    return n
-End Function
-
-Function parse_dns(message as Object)
-   id = 256 * message.Shift() + message.Shift()
-   flags = 256 * message.Shift() + message.Shift()
-   qd_count = 256 * message.Shift() + message.Shift()
-   an_count = 256 * message.Shift() + message.Shift()
-   ns_count = 256 * message.Shift() + message.Shift()
-   ar_count = 256 * message.Shift() + message.Shift()
-
-   questions = []
-   history = []
-   n = 12
-   For i = 1 To qd_count Step 1
-       n = parse_question(message, questions, history, n)
-   End For
-
-
-   return {id: id
-           flags: flags
-           questions: questions}
-End Function
-
-Function announce_packet()
-    announce = CreateObject("roByteArray")
-    
-    device_info = createobject("roDeviceInfo")
-    addresses = device_info.GetIPAddrs()
-    ip_addresses = []
-    For each address in addresses
-        ip = addresses[address]
-        this_address = createobject("roByteArray")
-        ipbytes = createobject("roByteArray")
-        ipbytes.fromAsciiString(ip)
-        digit = 0
-        For each byte in ipbytes
-            if byte = 46
-               this_address.push(digit)
-               digit = 0
-            Else
-                digit = digit * 10 + (byte - 48)
-            End If
-        End For
-        this_address.Push(digit)
-        ip_addresses.Push(this_address)
-    End For
-
-    ' Write ID 
-    announce[0] = 0
-    announce[1] = 0
-    ' Write flags
-    announce[2] = 132 '0x84
-    announce[3] = 0
-
-    ' 1 Questions
-    announce[4] = 0
-    announce[5] = 1
-    ' 5 Answer RRs
-    announce[6] = 0
-    announce[7] = 8
-    ' 0 Authority RRs
-    announce[8] = 0
-    announce[9] = 0
-    ' 1 Additional RRs
-    announce[10] = 0
-    announce[11] = ip_addresses.count()
-    
-    encode_questions(announce, [["roku", "_airplay", "_tcp", "local"]])
-'-----------------------------------------------------------------------------------------------------------
-    data = [{qname:["roku", "_airplay", "_tcp", "local"],
-              text:["deviceid=" + m.mac,
-                    "features=" + m.features,
-                    "model=AppleTV2,1"
-                    "srcvers=101.28"]},
-
-            {qname:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"],
-              text:["txtvers=1"
-                    "ch=2"
-                    "cn=0,1,2,3"
-                    "da=true"
-                    "et=0,3,5"
-                    "md=0,1,2"
-                    "pw=false"
-                    "sv=false"
-                    "sr=44100"
-                    "ss=16"
-                    "tp=UDP"
-                    "vn=65537"
-                    "vs=130.14"
-                    "am=AppleTV2,1"
-                    "sf=0x4"]},
-
-            {qname:["_services", "_dns-sd", "_udp", "local"],
-               ptr:["_airplay", "_tcp", "local"]},
-
-            {qname:["_services", "_dns-sd", "_udp", "local"],
-               ptr:["_raop", "_tcp", "local"]},
-
-            {qname:["_airplay", "_tcp", "local"],
-               ptr:["roku", "_airplay", "_tcp", "local"]},
-
-            {qname:["_raop", "_tcp", "local"],
-               ptr:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"]},
-
-            {qname:["roku", "_airplay", "_tcp", "local"],
-           service:{port:7000,
-                hostname:["roku", "local"]}},
-  
-            {qname:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"],
-           service:{port:7100,
-                hostname:["roku", "local"]}}]
-
-
-    For Each ip in ip_addresses
-        data.push({qname:["roku", "local"],
-                       a:ip})
-    End For
-    encode_answers(announce, data)
-                                 
-    return announce
-End Function
-
-
-Sub encode_questions(announce as Object, questions as Object)
-    For Each question in questions
-        encode_qname(announce, question)
-        ' Set the type to ANY
-        announce.Push(0)
-        announce.Push(255)
-
-        ' Set the class to IN, QU = false
-        announce.Push(0)
-        announce.Push(1)       
-    End For
-End Sub
-
-
-Sub encode_answers(announce as Object, answers as Object)
-    For Each answer in answers
-        encode_qname(announce, answer["qname"])
-        If answer["service"] <> invalid
-           encode_service(announce, answer["service"])
-        Else If answer["ptr"] <> invalid
-           encode_ptr(announce, answer["ptr"])
-        Else If answer["text"] <> invalid
-           encode_text(announce, answer["text"])
-        Else If answer["a"] <> invalid
-           encode_host(announce, answer["a"])
-        End If
-    End For
-End Sub
-
-
-Sub encode_ptr(announce as Object, auth as Object)
-    ' Set the type to PTR
-    announce.Push(0)
-    announce.Push(12)
-
-    ' Set the class to IN
-    announce.Push(0)
-    announce.Push(1)        
-
-    ' TTL is 1:15:00
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(17)
-    announce.Push(148)
-
-    ' Store the length
-    length = auth.Count() + 1
-    For Each chunk In auth
-        length = length + len(chunk)
-    End For
-    announce.Push(length / 256)
-
-    announce.Push(length MOD 256)
-    
-    encode_qname(announce, auth)
-End Sub
-
-Sub encode_host(announce as Object, auth as Object)
-    ' Set the type to A
-    announce.Push(0)
-    announce.Push(1)
-
-    ' Set the class to IN
-    announce.Push(0)
-    announce.Push(1)        
-
-    ' TTL is 120s
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(120)
-
-    ' Store the length
-    announce.Push(0)
-    announce.Push(4)
-
-    For Each chunk In auth
-        announce.Push(chunk)
-    End For
-End Sub
-    
-
-
-Sub encode_service(announce as Object, auth as Object)
-    ' Set the type to SRV
-    announce.Push(0)
-    announce.Push(33)
-
-    ' Set the class to IN
-    announce.Push(0)
-    announce.Push(1)        
-
-    ' TTL is 120s
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(120)
-
-    ' Store the length
-    length = auth["hostname"].Count() + 1
-    For Each chunk In auth["hostname"]
-        length = length + len(chunk)
-    End For
-    length = length + 6 ' Add space for priority, weight and port
-    announce.Push(length / 256)
-    announce.Push(length MOD 256)
-    
-    ' Priority 0
-    announce.push(0)
-    announce.push(0)
-
-    ' Weight 0
-    announce.push(0)
-    announce.push(0)
-
-    ' Port
-    announce.push(auth["port"] / 256)
-    announce.push(auth["port"] MOD 256)     
-
-    ' Hostname
-    encode_qname(announce, auth["hostname"])
-End Sub
-
-Sub encode_text(announce as Object, texts as Object)
-    ' Set the type to TXT
-    announce.Push(0)
-    announce.Push(16)
-
-    ' Set the class to IN
-    announce.Push(0)
-    announce.Push(1)        
-
-    ' TTL is 1:15:00
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(17)
-    announce.Push(148)
-
-    ' Store the length
-    length = texts.Count()
-    For Each chunk In texts
-        length = length + len(chunk)
-    End For
-    announce.Push(length / 256)
-    announce.Push(length MOD 256)
-
-    For Each chunk In texts
-        announce.Push(len(chunk))
-        bytes = createobject("roByteArray")
-        bytes.fromAsciiString(chunk)
-        For Each byte In bytes
-            announce.Push(byte)
-        End For
-    End For    
-End Sub
-
-
-
-Sub encode_qname(announce as Object, items as Object)
-    For Each item In items
-        bytes = createobject("roByteArray")
-        bytes.fromAsciiString(item)
-        announce.Push(bytes.Count())
-        For Each byte In bytes
-            announce.Push(byte)
-        End For
-    End For
-    announce.Push(0) ' End of qname
 End Sub
 
 
@@ -578,86 +253,3 @@ Sub send_mp4_request(socket as Object, path as string, start_range as string, en
     packet.fromAsciiString("GET " + path + " HTTP/1.1" + chr(13) + chr(10) + "Range: bytes=" + start_range +"-" + end_range + chr(13) + chr(10) + chr(13) + chr(10))
     socket.send(packet, 0, packet.Count())
 End Sub
-
-Function add_strings(a as String, b as String)
-    carry = 0
-    ' we want A to be longer than B. If B is longer than A, swap them
-    aa = createobject("roByteArray")
-    bb = createobject("roByteArray")
-    c = createobject("roByteArray")
-    if len(b) > len(a) then
-        aa.fromAsciiString(b)
-        bb.fromAsciiString(a)
-    else
-        aa.fromAsciiString(a)
-        bb.fromAsciiString(b)
-    End If    
-    While aa.count() > 0
-        aaa = aa.pop() - 48
-        if bb.count() > 0 then
-            bbb = bb.pop() - 48
-        else
-            bbb = 0
-        end if
-        sum = aaa + bbb + carry
-        carry = int(sum / 10)
-        sum = sum MOD 10
-        c.UnShift(sum + 48)
-    End While
-    if carry <> 0 then
-        c.UnShift(carry + 48)
-    end if
-    ' trim leading zeroes
-    while c[0] = 48
-        c.shift()
-    end while
-    return c.toAsciiString()
-End Function
-
-Function multiply_string(a as String, b as String)
-    carry = 0
-    ' we want A to be longer than B. If B is longer than A, swap them
-    aa = createobject("roByteArray")
-    bb = createobject("roByteArray")
-    products = []
-    if len(b) > len(a) then
-        aa.fromAsciiString(b)
-        bb.fromAsciiString(a)
-    else
-        aa.fromAsciiString(a)
-        bb.fromAsciiString(b)
-    End If
-    i = 0
-    For k = bb.count()-1 to 0 step - 1
-       c = createobject("roByteArray")
-       bbb = bb[k] - 48
-       For j = 1 to i step 1
-          ' Put i 0s into the product
-          c.UnShift(48)
-       End For
-       ' Muliply all of aa by bbb
-       For j = aa.count()-1 to 0 step -1
-          aaa = aa[j] - 48
-          product = aaa * bbb + carry
-          carry = int(product / 10)
-          c.UnShift((product MOD 10) + 48)
-       End For
-       if carry <> 0 then
-           c.UnShift(carry+48)
-       end if
-       products.push(c.toAsciiString())
-       i = i + 1
-       carry = 0
-    End For
-    ' Now sum them all up
-    result = "0"
-    For each product in products
-        result = add_strings(result, product)
-    End For
-    return result
-End Function
-
-Function add_byte(a as String, b as Integer)
-    f = multiply_string(a, "256")
-    return add_strings(f, b.toStr())
-End Function 
