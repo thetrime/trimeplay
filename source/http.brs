@@ -14,12 +14,12 @@ Function read_http(connection as Object, request as Object)
     length = connection.getCountRcvBuf()
     'print "Processing message on socket: " ; connection.getID() ; " of length " ; length
     If request.state < 6 Then
-        request.buffer[length] = 0
-        request.buffer[length] = invalid
+        request.buffer[length-1] = 0
+        request.buffer[length-1] = invalid
         r = connection.receive(request.buffer, 0, length)
     Else        
-        request.body[request.content_length] = 0
-        request.body[request.content_length] = invalid
+        request.body[request.content_length-1] = 0
+        request.body[request.content_length-1] = invalid
         r = connection.receive(request.body, request.body_size, length)
         request.body_size = request.body_size + length
     End If

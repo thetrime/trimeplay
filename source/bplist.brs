@@ -3,8 +3,6 @@
 Function parse_bplist(raw as Object)
     magic = createobject("roByteArray")
     trailer = createobject("roByteArray")
-    ' FIXME: Why is there a spurious 0 at the end?
-    raw.pop()
     For i = 1 to 6 Step 1
         magic.push(raw.Shift())
     End For

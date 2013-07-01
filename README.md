@@ -23,7 +23,6 @@ What does not (because either it never will or I have no interest in doing it)
 
 What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
-   * Photos look ugly (wrong colour, wrong origin) sometimes. I think this is an off-by-one error in transfer
    * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
 
 LICENSE:
