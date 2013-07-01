@@ -7,7 +7,7 @@ Function Main()
 
     m.port = msgPort
     m.state = "none"
-    m.video_paused = true
+    m.video_state = 0
     m.video_position = 0
 
     device_info = createobject("roDeviceInfo")
@@ -106,7 +106,7 @@ Function Main()
                      m.connections[Stri(client.getID())] = client
                 End If
             Else if event.getSocketID() = mirror.getID()
-                 print "MIRRORING"
+                 print "MIRRORING CONNECTION?"
                  client = mirror.accept()
                  If client = Invalid
                      print "Accept failed"                   
@@ -120,6 +120,7 @@ Function Main()
                 connection = m.connections[Stri(event.getSocketID())]
                 ' If connection is invalid, what does that mean?
                 if connection <> invalid
+                    ' FIXME: Is this still right since I added the mp4 stuff? Do we actually correctly close sockets?
                     if connection.isReadable() and connection.getCountRcvBuf() = 0 and not connection.isWritable() Then
                         ' Apparently this means the connection has been closed
                         ' What a terrible way to indicate it
@@ -134,27 +135,18 @@ Function Main()
                 End If
             End If
         Else If type(event)="roVideoScreenEvent" Then
-            if not event.isPlaybackPosition() then
-                print "Video screen event"
-            end if
             if event.isStreamStarted()
-               print "isStarted"
-               if m.video_paused then
-                   m.video_screen.Pause()
-                   send_event("state", "paused")
-               end if               
+               m.video_state = 1 ' playing
+               send_event("state", "playing")
                m.video_position = event.GetIndex()
             else if event.isPlaybackPosition()
-               print "isPlaybackPosition"
                m.video_position = event.GetIndex()
             else if event.isPaused()
-               print "isPaused"
+               m.video_state = 2 'paused
                send_event("state", "paused")
-               m.video_paused = true
             else if event.isResumed()
-               print "isResumed"
                send_event("state", "playing")
-               m.video_paused = false            
+               m.video_state = 1 ' playing
             End If
             print "Position is now "; m.video_position 
         Else
@@ -584,8 +576,7 @@ Sub send_mp4_request(socket as Object, path as string, start_range as string, en
     packet = createobject("roByteArray")
 
     packet.fromAsciiString("GET " + path + " HTTP/1.1" + chr(13) + chr(10) + "Range: bytes=" + start_range +"-" + end_range + chr(13) + chr(10) + chr(13) + chr(10))
-    print packet.toAsciiString()
-    print socket.send(packet, 0, packet.Count())
+    socket.send(packet, 0, packet.Count())
 End Sub
 
 Function add_strings(a as String, b as String)

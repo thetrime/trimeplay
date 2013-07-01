@@ -1,5 +1,5 @@
 Function handle_mp4_data(connection as Object, request as Object)
-    print "Got some delicious MP4 data!"
+    'print "Got some delicious MP4 data!"
     ' Read the length of the atom as a string, because otherwise brightscript will screw it up :(
     atom_length = add_byte("0", request.body.shift())
     atom_length = add_byte(atom_length, request.body.shift())
@@ -11,7 +11,7 @@ Function handle_mp4_data(connection as Object, request as Object)
     atom_name = atom_name + chr(request.body.shift())
     atom_name = atom_name + chr(request.body.shift())
 
-    print "Atom is " ; atom_name ; " and is of length " ; atom_length
+    'print "Atom is " ; atom_name ; " and is of length " ; atom_length
     if atom_length = "1" then
         ' 64-bit atom length follows       
         atom_length = add_byte("0", request.body.shift())
@@ -22,7 +22,7 @@ Function handle_mp4_data(connection as Object, request as Object)
         atom_length = add_byte(atom_length, request.body.shift())
         atom_length = add_byte(atom_length, request.body.shift())
         atom_length = add_byte(atom_length, request.body.shift())
-        print "Atom is ACTUALLY of length " ; atom_length
+        'print "Atom is ACTUALLY of length " ; atom_length
     end if    
 
     if atom_name = "moov" then
@@ -39,8 +39,6 @@ Function handle_mp4_data(connection as Object, request as Object)
         ' Sweet. Now we can get the data we crave!
         timescale = (((((request.body[12] * 256) + request.body[13]) * 256) + request.body[14]) * 256) + request.body[15]
         duration = (((((request.body[16] * 256) + request.body[17]) * 256) + request.body[17]) * 256) + request.body[19]
-        print "timescale: " ; timescale
-        print "duration: " ; duration
         m.video_duration = duration / timescale
         print "Movie length detected to be " ; m.video_duration ; " seconds"
         ' Got it. Mark everything as invalid and hang up!
@@ -57,11 +55,9 @@ Function handle_mp4_data(connection as Object, request as Object)
         content.length = int(m.video_duration)
         content.playstart = play_start
         content.StreamFormat = "mp4"
+        m.video_state = 0
         m.video_screen.setContent(content)
-        print "Video is created. video_paused is "; m.video_paused
-        if m.video_paused then
-            m.video_screen.Pause()
-        end if
+        m.video_screen.Pause()
     else
         ' Oh well. Skip this atom        
         new_start = add_strings(request.start_range, atom_length)

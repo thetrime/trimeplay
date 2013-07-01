@@ -11,7 +11,7 @@ Function handle_reverse(http as Object, connection as Object)
     reply = createobject("roByteArray")
     reply.fromAsciiString("HTTP/1.1 101 Switching Protocols" + chr(13) + chr(10) + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10) + "Upgrade: PTTH/1.0" + chr(13) + chr(10) + "Connection: Upgrade" + chr(13) + chr(10) + chr(13) + chr(10))
     status = connection.send(reply, 0, reply.Count())
-    print "Reversal: " ; connection.getID()
+    print "Reversal on: " ; connection.getID()
     m.reversals[Stri(connection.getID())] = connection
     m.current_connection = connection
     return status
@@ -201,7 +201,7 @@ End Function
 
 
 Function handle_playback_info(http as Object, connection as Object)
-    If m.video_paused Then    
+    If m.video_state = 0 or m.video_state = 2 Then    
         f_rate = "0"
     Else
         f_rate = "1"
@@ -257,11 +257,11 @@ Function handle_rate(http as Object, connection as Object)
     if val(http.search["value"]) = 0 Then
        print "Pausing"
        m.video_screen.Pause()
-       m.video_paused = true
+       m.video_state = 2
     Else if val(http.search["value"]) = 1 Then
        print "Resuming"
        m.video_screen.Resume()
-       m.video_paused = false
+       m.video_state = 1
     Else
        print "unexpected rate:" ; http.search["value"]
     End If
@@ -270,7 +270,7 @@ End Function
 
 Function handle_get_property(http as Object, connection as Object)
     print http.search
-    ' FIXME: not implemente
+    ' FIXME: not implemented
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
@@ -318,14 +318,13 @@ Function send_http_reply(connection as Object, content_type as String, data as S
     packet = packet + "Content-Length: " + str(len(data)) + chr(13) + chr(10) + chr(13) + chr(10)
     packet = packet + data
     reply.fromAsciiString(packet)
-    'print data
     status = connection.send(reply, 0, reply.Count())
     return status
 End Function
 
 
 Function dispatch_http(http as Object, connection as Object)
-    if http.path <> "/playback-info" 
+    if http.path <> "/playback-info" ' Cut down on noise
          print "Handling " ; http.path
     end if
     If http.path = "/reverse" Then
