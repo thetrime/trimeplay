@@ -19,8 +19,15 @@ Function send_event(key as String, value as String)
     m.current_connection.send(bytes, 0, bytes.Count())
 End Function
 
-Function read_http_reply(connection as Object, reply as Object)
+Function read_http_reply(reply as Object, connection as Object)
     length = connection.getCountRcvBuf()
+    if length = 0 then
+         print "Unexpected EOF"
+         GetGlobalAA().connections[Stri(connection.getID())] = invalid
+         GetGlobalAA().sockets[Stri(connection.getID())] = invalid
+         connection.close()
+         return false
+    End If
     If reply.state < 6 Then
         reply.buffer[length-1] = 0
         reply.buffer[length-1] = invalid
@@ -38,6 +45,7 @@ Function read_http_reply(connection as Object, reply as Object)
     else if reply.state = 6 Then
         parse_http_body(connection, reply)
     end if
+    print "Reading http reply.... " ; reply.state ; "(length was " ; length ; ")"
     return reply.state = 7
 End Function
 
@@ -58,9 +66,15 @@ Function parse_http_status(connection as Object, reply as Object)
     End While
 End Function
 
+Function handle_http_reverse(connection as Object, reply as Object)
+    print "HTTP Reply received for reverse?"
+End Function
+
 Function create_new_reply()
     return { state: 0
            headers: {}            
+         read_data: read_http_reply
+      process_data: handle_http_reverse
          body_size: 0
          
       status_bytes: createobject("roByteArray")

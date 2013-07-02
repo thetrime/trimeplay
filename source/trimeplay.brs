@@ -20,7 +20,6 @@ Function Main()
     m.features = "3"
     'm.features = "0x39f7"
     ' Set up some stuff so we can display screens later in the http handlers
-
     m.port = msgPort
     m.state = "none"
     m.video_state = 0
@@ -41,9 +40,8 @@ Function Main()
     default_screen.show()
 
     m.reversals = {}
-    http_replies = {}
-    m.mp4_connections = {}
     m.connections = {}
+    m.sockets = {}
     http_requests = {}
     udp = createobject("roDatagramSocket")
     udp.setMessagePort(msgPort)
@@ -119,7 +117,7 @@ Function Main()
                  Else
                      client.notifyReadable(true)
                      client.setMessagePort(msgPort)
-                     m.connections[Stri(client.getID())] = client
+                     m.sockets[Stri(client.getID())] = client
                 End If
             Else if event.getSocketID() = mirror.getID()
                  print "MIRRORING CONNECTION?"
@@ -129,11 +127,11 @@ Function Main()
                  Else
                      client.notifyReadable(true)
                      client.setMessagePort(msgPort)
-                     m.connections[Stri(client.getID())] = client
+                     m.sockets[Stri(client.getID())] = client
                 End If
             Else
                 ' Must be a client connection!
-                connection = m.connections[Stri(event.getSocketID())]
+                connection = m.sockets[Stri(event.getSocketID())]
                 ' If connection is invalid, what does that mean?
                 if connection <> invalid
                     ' FIXME: Is this still right since I added the mp4 stuff? Do we actually correctly close sockets?
@@ -142,9 +140,9 @@ Function Main()
                         ' What a terrible way to indicate it
                         print "Connection is closed"
                         connection.close()
-                        m.connections[Stri(event.getSocketID())] = invalid
+                        m.sockets[Stri(event.getSocketID())] = invalid
                     Else
-                        handle_tcp(connection, http_requests, http_replies)
+                        handle_tcp(connection)
                     End If
                 else 
                     print "Invalid connection"
@@ -173,120 +171,92 @@ Function Main()
     udp.close()
 End Function
 
-
-Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Object)
-    If m.reversals[Stri(connection.getID())] <> invalid Then
-        ' Data arriving on reverse connection
-        if connection.getCountRcvBuf() = 0 Then
+Sub handle_tcp(connection as Object)
+    request = m.connections[Stri(connection.getID())]
+    If request = invalid Then
+        ' An unsolicited request. Create an http handler for it
+        request = create_new_request()        
+        m.connections[Stri(connection.getID())] = request
+    End if
+    status = request.read_data(request, connection)
+    If status = false Then ' More data is required
+       return
+    Else if status = true Then 'Data is complete. Execute handler
+        ' Regardless of whether the socket is to be closed, the HTTP request has finished. We have to invalidate it here
+        ' since the process_data() call might set up something else
+        m.connections[Stri(connection.getID())] = invalid
+        should_close = request.process_data(request, connection)
+        if should_close then
+            m.sockets[Stri(connection.getID())] = invalid
             connection.close()
-            m.reversals[Stri(connection.getID())] = invalid
-        else
-            reply = http_replies[Stri(connection.getID())]
-            if reply = invalid Then
-                reply = create_new_reply()
-            end if
-            is_complete = read_http_reply(connection, reply)
-            if is_complete then
-                print "Got reply. Status was " ; reply.status
-                read_http_reply(connection, reply)
-                http_replies[Stri(connection.getID())] = invalid
-            End if
         end if
-    Else if m.mp4_connections[Stri(connection.getID())] <> invalid Then
-        ' A response to an MP4 data request
-        request = m.mp4_connections[Stri(connection.getID())]
-        if connection.getCountRcvBuf() = 0 and not connection.isWritable() Then
-            print "Closing mp4 connection"
-            connection.close()
-            m.connections[Stri(connection.getID())] = invalid
-            m.mp4_connections[Stri(connection.getID())] = invalid           
-        else if request.state = -1 then
-            print "Connection status: " ; connection.isConnected() ; " -> " ; connection.eOK()
-            print "Sending mp4 request for " ; request.start_byte ; " to " ; request.end_byte ; " to " ; request.hostname ; " on " ; connection.getID()
-            send_mp4_request(connection, request.path, request.start_byte, request.end_byte, request.hostname, request.port)
-        else
-            is_complete = read_http_reply(connection, request)
-            if is_complete then
-                ' May be redirect!
-                If request.status = "302" Then
-                    ' We need to do this over then
-                    connection.close()
-                    m.connections[Stri(connection.getID())] = invalid
-                    m.mp4_connections[Stri(connection.getID())] = invalid
-                    new_url = parse_url(request.headers["location"])
-                    print "Following redirect to " ; new_url
-                    load_video_parameters(new_url.hostname, new_url.port, new_url.path, request.start_byte, request.end_byte)
-                Else
-                    print "Got mp4"
-                    handle_mp4_data(connection, request)
-                End If
-            end if
-        end if
-    Else
-        ' A request from the iDevice
-        request = http_requests[Stri(connection.getID())]
-        If request = invalid Then
-           'print "New request on socket"
-           request = create_new_request()
-           http_requests[Stri(connection.getID())] = request
-        End If
-        is_complete = read_http(connection, request)
-        If is_complete Then
-            dispatch_http(request, connection)
-            ' Mark as finished
-            http_requests[Stri(connection.GetID())] = invalid
-        end if
+    Else ' Error condition. Not handled (FIXME! Need to return ints instead of booleans so we have a third case. Or invalid?)
+        stop
     End If
 End Sub
 
-
-Sub load_video_parameters(hostname as String, port as integer, path as String, start_byte as String, end_byte as String)
-    print "Loading video parameters for " ; hostname ; " on port " ; port ; " on path " ;path
+Sub start_media(url as Object)
+    ' Hokay. First, we don't even know the media type. Let's open a connection so we can ask about it
+    print "Loading media parameters for " ; url
     socket = createobject("roStreamSocket")
     socket.setMessagePort(m.port)
-    mp4_addr = CreateObject("roSocketAddress")
-    mp4_addr.setPort(port)
-    mp4_addr.setHostName(hostname)      
+    media_addr = CreateObject("roSocketAddress")
+    media_addr.setPort(url.port)
+    media_addr.setHostName(url.hostname)      
     request = create_new_request()
-    m.mp4_connections[Stri(socket.getID())] = request
-    m.mp4_connections[Stri(socket.getID())].state = -1 ' unconnected
-    m.connections[Stri(socket.getID())] = socket
-    request.path = path
-    request.hostname = hostname
-    request.port = port
-    request.start_byte = start_byte
-    request.end_byte = end_byte
-    socket.setSendToAddress(mp4_addr)
+    m.connections[Stri(socket.getID())] = request
+    m.sockets[Stri(socket.getID())] = socket
+    ' Slightly confusing, but 'read data' also means 'when connected'. We change it once we have written the message
+    request.read_data = get_media_type 
+    request.process_data = invalid
+    ' Also copy in some other stuff we need in a bit
+    request.path = url.path
+    request.hostname = url.hostname
+    request.port = url.port
+    socket.setSendToAddress(media_addr)
     socket.notifyReadable(true)
     socket.notifyWritable(true)
-    print "Connecting to get mp4 data on " ; socket.getID()
     socket.connect()
+    ' And now we wait
 End Sub
 
-' We have to keep the ranges as strings, since brightscript will coerce them to floats, and print them out in scientific notation
-' which iOS does not care for. Worse, because we lose precision, we cannot reliably get it back
-' add_strings() below adds two strings
-Sub send_mp4_request(socket as Object, path as string, start_range as string, end_range as string, hostname as string, port as Integer)    
-    if socket.eOK() and socket.isWritable() then
-        print "Sending mp4 request " ; socket.eOK() ; socket.isWritable() ; socket.status() ; socket.getCountSendBuf() ; socket.eSuccess()
-        reply = create_new_reply()
-        m.mp4_connections[Stri(socket.getID())] = reply
-        reply.start_range = start_range
-        reply.hostname = hostname
-        reply.port = port
-        reply.path = path
-        reply.start_byte = start_range  
-        reply.end_byte = end_range
-        packet = createobject("roByteArray")
-        request = "GET " + path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + hostname + chr(13) + chr(10) + "Range: bytes=" + start_range +"-" + end_range + chr(13) + chr(10) + chr(13) + chr(10)
-        print request
-        packet.fromAsciiString(request)
-        socket.send(packet, 0, packet.Count())
-    Else
-        ' They hung up on us!
-        print "Hangup detected?"
+Function get_media_type(request as Object, socket as Object)
+    reply = create_new_reply()
+    reply.process_data = process_media_type
+
+    ' Switch out the request for the reply
+    GetGlobalAA().connections[Stri(socket.getID())] = reply
+
+    ' But don't forget to copy across the important stuff
+    reply.hostname = request.hostname
+    reply.port = request.port
+    reply.path = request.path
+
+    packet = createobject("roByteArray")
+    ' Originally I wanted to do HEAD here, and examine the content-type. Well, guess what? 
+    ' iOS just disconnects if I ask for HEAD. Worse, everything is reported to be content-type: application/octet-stream. Great.
+    msg = "GET " + request.path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + request.hostname + chr(13) + chr(10) + "Range: bytes=0-8" + chr(13) + chr(10) + chr(13) + chr(10)
+    print msg
+    socket.notifyWritable(false)
+    packet.fromAsciiString(msg)
+    print socket.send(packet, 0, packet.Count())
+    return false ' Do not try to process media type yet, though, since we don't have it!
+End Function
+
+Function process_media_type(reply as Object, socket as Object)
+    ' Heuristic time. First, if the header tells us, great
+    if Lcase(reply.headers["content-type"]) = "something" then
         stop
-        load_video_parameters(hostname, port, path, start_range, end_range)
-    End If
-End Sub
-    
+    else
+        ' Ok, so how about the body?
+        if reply.body[4] = 102 and reply.body[5] = 116 and reply.body[6] = 121 and reply.body[7] = 112 then
+            ' MP4 (probably)
+            print "MP4 signature detected"
+            load_mp4_file(reply, socket)
+        else
+            print "Unknown file type :("
+            stop
+        end if
+    end if
+    return false
+End Function

@@ -6,7 +6,7 @@ Function handle_fairplay(http as Object, connection as Object)
     return status    
 End Function
 
-
+' FIXME: New architecture breaks this. There is no m.reversals
 Function handle_reverse(http as Object, connection as Object)
     reply = createobject("roByteArray")
     reply.fromAsciiString("HTTP/1.1 101 Switching Protocols" + chr(13) + chr(10) + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10) + "Upgrade: PTTH/1.0" + chr(13) + chr(10) + "Connection: Upgrade" + chr(13) + chr(10) + chr(13) + chr(10))
@@ -177,7 +177,8 @@ Function handle_play(http as Object, connection as Object)
         m.current_video_fraction = params["start-position"]
     end if
     url = parse_url(params["content-location"])
-    load_video_parameters(url.hostname, url.port, url.path, "0", "1024")
+    'load_video_parameters(url.hostname, url.port, url.path, "0", "1024")
+    start_media(url)
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
@@ -359,7 +360,8 @@ Function dispatch_http(http as Object, connection as Object)
     Else If http.path = "/getProperty" Then
         status = handle_get_property(http, connection)
     Else
-        print "Unexpected URI: "; http.path
+        print "Unexpected URI: "; http.path ; " on " ; connection.getID()
     End If
     'print "Status: " ; status
+    return false ' Keep-alive
 End Function

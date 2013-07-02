@@ -4,13 +4,15 @@ Function create_new_request()
              method: ""
           body_size: 0
              search: {}
+          read_data: read_http
+       process_data: dispatch_http
           pathBytes: createobject("roByteArray")
              buffer: createobject("roByteArray")
                body: createobject("roByteArray")
            }
 End Function
 
-Function read_http(connection as Object, request as Object)
+Function read_http(request as Object, connection as Object)
     length = connection.getCountRcvBuf()
     'print "Processing message on socket: " ; connection.getID() ; " of length " ; length
     If request.state < 6 Then
