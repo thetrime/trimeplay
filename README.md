@@ -3,7 +3,7 @@ trimeplay
 
 Airplay server for Roku.
 
-Somewhat experimental at this stage. Probably usable if you're willing to ignore a few problems
+Somewhat experimental at this stage. Probably usable if you're willing to ignore a few problems. If you have a Roku, you can try it by going to https://owner.roku.com/add/2XQQN but be aware that the version installed here may lag behind the version in git!
 
 Things that work:
    * Viewing photos
@@ -25,6 +25,10 @@ What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
    * Sockets are not correctly cleaned up. See the fixme in trimeplay.brs
    * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
+
+What could be done
+   * Parsing m3u8 files (sbs, for example)
+   * non-mp4 Quicktime support? (Trailers app)
 
 LICENSE:
 
