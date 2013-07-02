@@ -34,9 +34,15 @@ Function handle_mp4_data(connection as Object, request as Object)
             new_start = add_strings(request.start_range, "8")
         end if
         new_end = add_strings(new_start, "1024")
-        load_video_parameters(request.hostname, request.port, request.path, new_start, new_end)
-        connection.close()
-        'send_mp4_request(connection, request.path, new_start, new_end, request.hostname, request.port)
+        if request.headers["connection"] <> invalid and request.headers["connection"] = "close" then
+            m.connections[Stri(connection.getID())] = invalid
+            m.mp4_connections[Stri(connection.getID())] = invalid
+            connection.close()
+
+            load_video_parameters(request.hostname, request.port, request.path, new_start, new_end)
+        else
+            send_mp4_request(connection, request.path, new_start, new_end, request.hostname, request.port)
+        end if
     else if atom_name = "mvhd" then
         ' Sweet. Now we can get the data we crave!
         timescale = (((((request.body[12] * 256) + request.body[13]) * 256) + request.body[14]) * 256) + request.body[15]
@@ -66,8 +72,15 @@ Function handle_mp4_data(connection as Object, request as Object)
         ' Oh well. Skip this atom        
         new_start = add_strings(request.start_range, atom_length)
         new_end = add_strings(new_start, "1024")
-        load_video_parameters(request.hostname, request.port, request.path, new_start, new_end)
-        connection.close()
-        'send_mp4_request(connection, request.path, new_start, new_end, request.hostname, request.port)
+        if request.headers["connection"] <> invalid and request.headers["connection"] = "close" then
+            m.connections[Stri(connection.getID())] = invalid
+            m.mp4_connections[Stri(connection.getID())] = invalid
+            connection.close()
+            print "Have to get a new connection"
+            load_video_parameters(request.hostname, request.port, request.path, new_start, new_end)
+        else
+            print "Reusing connection"
+            send_mp4_request(connection, request.path, new_start, new_end, request.hostname, request.port)
+        end if
     End if       
 End Function

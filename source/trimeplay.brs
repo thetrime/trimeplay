@@ -148,6 +148,7 @@ Function Main()
                     End If
                 else 
                     print "Invalid connection"
+                    stop
                 End If
             End If
         Else If type(event)="roVideoScreenEvent" Then
@@ -194,9 +195,14 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
     Else if m.mp4_connections[Stri(connection.getID())] <> invalid Then
         ' A response to an MP4 data request
         request = m.mp4_connections[Stri(connection.getID())]
-        if request.state = -1 then
-            print "Status: " ; connection.isConnected()
-            print "Sending mp4 request for " ; request.start_byte ; " to " ; request.end_byte ; " to " ; request.hostname
+        if connection.getCountRcvBuf() = 0 and not connection.isWritable() Then
+            print "Closing mp4 connection"
+            connection.close()
+            m.connections[Stri(connection.getID())] = invalid
+            m.mp4_connections[Stri(connection.getID())] = invalid           
+        else if request.state = -1 then
+            print "Connection status: " ; connection.isConnected() ; " -> " ; connection.eOK()
+            print "Sending mp4 request for " ; request.start_byte ; " to " ; request.end_byte ; " to " ; request.hostname ; " on " ; connection.getID()
             send_mp4_request(connection, request.path, request.start_byte, request.end_byte, request.hostname, request.port)
         else
             is_complete = read_http_reply(connection, request)
@@ -235,7 +241,7 @@ End Sub
 
 
 Sub load_video_parameters(hostname as String, port as integer, path as String, start_byte as String, end_byte as String)
-    print "Loading video parameters for " ; hostname ; ":" ; port ; path
+    print "Loading video parameters for " ; hostname ; " on port " ; port ; " on path " ;path
     socket = createobject("roStreamSocket")
     socket.setMessagePort(m.port)
     mp4_addr = CreateObject("roSocketAddress")
@@ -261,7 +267,8 @@ End Sub
 ' which iOS does not care for. Worse, because we lose precision, we cannot reliably get it back
 ' add_strings() below adds two strings
 Sub send_mp4_request(socket as Object, path as string, start_range as string, end_range as string, hostname as string, port as Integer)    
-    if true then
+    if socket.eOK() and socket.isWritable() then
+        print "Sending mp4 request " ; socket.eOK() ; socket.isWritable() ; socket.status() ; socket.getCountSendBuf() ; socket.eSuccess()
         reply = create_new_reply()
         m.mp4_connections[Stri(socket.getID())] = reply
         reply.start_range = start_range
@@ -278,6 +285,7 @@ Sub send_mp4_request(socket as Object, path as string, start_range as string, en
     Else
         ' They hung up on us!
         print "Hangup detected?"
+        stop
         load_video_parameters(hostname, port, path, start_range, end_range)
     End If
 End Sub
