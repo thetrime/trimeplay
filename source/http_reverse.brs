@@ -22,12 +22,12 @@ End Function
 Function read_http_reply(connection as Object, reply as Object)
     length = connection.getCountRcvBuf()
     If reply.state < 6 Then
-        reply.buffer[length] = 0
-        reply.buffer[length] = invalid
+        reply.buffer[length-1] = 0
+        reply.buffer[length-1] = invalid
         r = connection.receive(reply.buffer, 0, length)
     Else        
-        reply.body[reply.content_length] = 0
-        reply.body[reply.content_length] = invalid
+        reply.body[reply.content_length-1] = 0
+        reply.body[reply.content_length-1] = invalid
         r = connection.receive(reply.body, reply.body_size, length)
         reply.body_size = reply.body_size + length
     End If
@@ -46,8 +46,8 @@ Function parse_http_status(connection as Object, reply as Object)
         code = reply.buffer.Shift()
         if code = 10 then
             line = reply.status_bytes.toAsciiString()
-            reply.status = val(mid(line, 10, 3))
-            print "Status is " ; reply.status            
+            reply.status = mid(line, 10, 3)
+            print "Status is:" ; reply.status
             reply.state = 4
             reply.headerName = createobject("roByteArray")
             parse_http_headers(connection, reply)

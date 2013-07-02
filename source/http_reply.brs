@@ -169,10 +169,15 @@ Function handle_play(http as Object, connection as Object)
 
     ' We need to get the length of the video. This is incredibly difficult, despite the fact that the Roku KNOWS it
     ' There is apparently a request to provide this in the future. But tomorrow is always a day away...
-    m.current_video_url = params["content-location"]   
-    m.current_video_fraction = params["start-position"]
+    print "Url: " ; params["content-location"]
+    m.current_video_url = params["content-location"]
+    if type(params["start-position"]) = "String" then
+        m.current_video_fraction = val(params["start-position"])
+    else
+        m.current_video_fraction = params["start-position"]
+    end if
     url = parse_url(params["content-location"])
-    load_video_parameters(url.hostname, url.port, url.path)
+    load_video_parameters(url.hostname, url.port, url.path, "0", "1024")
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 

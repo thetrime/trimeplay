@@ -1,5 +1,5 @@
 Function handle_mp4_data(connection as Object, request as Object)
-    'print "Got some delicious MP4 data!"
+    print "Got some delicious MP4 data!"
     ' Read the length of the atom as a string, because otherwise brightscript will screw it up :(
     atom_length = add_byte("0", request.body.shift())
     atom_length = add_byte(atom_length, request.body.shift())
@@ -10,8 +10,8 @@ Function handle_mp4_data(connection as Object, request as Object)
     atom_name = atom_name + chr(request.body.shift())
     atom_name = atom_name + chr(request.body.shift())
     atom_name = atom_name + chr(request.body.shift())
-
-    'print "Atom is " ; atom_name ; " and is of length " ; atom_length
+    
+    print "Atom is " ; atom_name ; " and is of length " ; atom_length
     if atom_length = "1" then
         ' 64-bit atom length follows       
         atom_length = add_byte("0", request.body.shift())
@@ -34,7 +34,9 @@ Function handle_mp4_data(connection as Object, request as Object)
             new_start = add_strings(request.start_range, "8")
         end if
         new_end = add_strings(new_start, "1024")
-        send_mp4_request(connection, request.path, new_start, new_end)
+        load_video_parameters(request.hostname, request.port, request.path, new_start, new_end)
+        connection.close()
+        'send_mp4_request(connection, request.path, new_start, new_end, request.hostname, request.port)
     else if atom_name = "mvhd" then
         ' Sweet. Now we can get the data we crave!
         timescale = (((((request.body[12] * 256) + request.body[13]) * 256) + request.body[14]) * 256) + request.body[15]
@@ -47,6 +49,8 @@ Function handle_mp4_data(connection as Object, request as Object)
         connection.close()
         ' Now we can finally start playing the video
         content = {}
+        print type(m.current_video_fraction)
+        print type(m.video_duration)
         play_start = Int(m.video_duration * m.current_video_fraction)
         print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
         content.Stream = { url:m.current_video_url
@@ -62,6 +66,8 @@ Function handle_mp4_data(connection as Object, request as Object)
         ' Oh well. Skip this atom        
         new_start = add_strings(request.start_range, atom_length)
         new_end = add_strings(new_start, "1024")
-        send_mp4_request(connection, request.path, new_start, new_end)
+        load_video_parameters(request.hostname, request.port, request.path, new_start, new_end)
+        connection.close()
+        'send_mp4_request(connection, request.path, new_start, new_end, request.hostname, request.port)
     End if       
 End Function

@@ -229,7 +229,10 @@ Function parse_url(s as string)
         else if state = 2 then '/
             state = 3
         else if state = 3 then
-            if byte = 58 then
+            if byte = 47 then
+                url.port = 80
+                state = 5
+            else if state = 58 then
                 state = 4
             else
                 url.hostname = url.hostname + chr(byte)

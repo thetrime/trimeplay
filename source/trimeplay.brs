@@ -195,12 +195,25 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
         ' A response to an MP4 data request
         request = m.mp4_connections[Stri(connection.getID())]
         if request.state = -1 then
-            print "Sending mp4 request"
-            send_mp4_request(connection, request.path, "0", "1024")
+            print "Status: " ; connection.isConnected()
+            print "Sending mp4 request for " ; request.start_byte ; " to " ; request.end_byte ; " to " ; request.hostname
+            send_mp4_request(connection, request.path, request.start_byte, request.end_byte, request.hostname, request.port)
         else
             is_complete = read_http_reply(connection, request)
             if is_complete then
-                handle_mp4_data(connection, request)
+                ' May be redirect!
+                If request.status = "302" Then
+                    ' We need to do this over then
+                    connection.close()
+                    m.connections[Stri(connection.getID())] = invalid
+                    m.mp4_connections[Stri(connection.getID())] = invalid
+                    new_url = parse_url(request.headers["location"])
+                    print "Following redirect to " ; new_url
+                    load_video_parameters(new_url.hostname, new_url.port, new_url.path, request.start_byte, request.end_byte)
+                Else
+                    print "Got mp4"
+                    handle_mp4_data(connection, request)
+                End If
             end if
         end if
     Else
@@ -221,7 +234,8 @@ Sub handle_tcp(connection as Object, http_requests as Object, http_replies as Ob
 End Sub
 
 
-Sub load_video_parameters(hostname as String, port as integer, path as String)
+Sub load_video_parameters(hostname as String, port as integer, path as String, start_byte as String, end_byte as String)
+    print "Loading video parameters for " ; hostname ; ":" ; port ; path
     socket = createobject("roStreamSocket")
     socket.setMessagePort(m.port)
     mp4_addr = CreateObject("roSocketAddress")
@@ -232,24 +246,39 @@ Sub load_video_parameters(hostname as String, port as integer, path as String)
     m.mp4_connections[Stri(socket.getID())].state = -1 ' unconnected
     m.connections[Stri(socket.getID())] = socket
     request.path = path
+    request.hostname = hostname
+    request.port = port
+    request.start_byte = start_byte
+    request.end_byte = end_byte
     socket.setSendToAddress(mp4_addr)
     socket.notifyReadable(true)
     socket.notifyWritable(true)
     print "Connecting to get mp4 data on " ; socket.getID()
     socket.connect()
-    'send_mp4_request(socket, path, 0, 1024)
 End Sub
 
 ' We have to keep the ranges as strings, since brightscript will coerce them to floats, and print them out in scientific notation
 ' which iOS does not care for. Worse, because we lose precision, we cannot reliably get it back
 ' add_strings() below adds two strings
-Sub send_mp4_request(socket as Object, path as string, start_range as string, end_range as string)    
-    reply = create_new_reply()
-    m.mp4_connections[Stri(socket.getID())] = reply
-    reply.start_range = start_range
-    reply.path = path
-    packet = createobject("roByteArray")
-
-    packet.fromAsciiString("GET " + path + " HTTP/1.1" + chr(13) + chr(10) + "Range: bytes=" + start_range +"-" + end_range + chr(13) + chr(10) + chr(13) + chr(10))
-    socket.send(packet, 0, packet.Count())
+Sub send_mp4_request(socket as Object, path as string, start_range as string, end_range as string, hostname as string, port as Integer)    
+    if true then
+        reply = create_new_reply()
+        m.mp4_connections[Stri(socket.getID())] = reply
+        reply.start_range = start_range
+        reply.hostname = hostname
+        reply.port = port
+        reply.path = path
+        reply.start_byte = start_range  
+        reply.end_byte = end_range
+        packet = createobject("roByteArray")
+        request = "GET " + path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + hostname + chr(13) + chr(10) + "Range: bytes=" + start_range +"-" + end_range + chr(13) + chr(10) + chr(13) + chr(10)
+        print request
+        packet.fromAsciiString(request)
+        socket.send(packet, 0, packet.Count())
+    Else
+        ' They hung up on us!
+        print "Hangup detected?"
+        load_video_parameters(hostname, port, path, start_range, end_range)
+    End If
 End Sub
+    
