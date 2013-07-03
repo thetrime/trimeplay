@@ -90,7 +90,9 @@ End Function
 
 Function handle_mpegurl_data(request as Object, socket as Object)
     header = read_line(request)
+    state = 0
     print "Header: " ; header
+    duration = 0
     if header <> "#EXTM3U" then
        print "unexpected header"
        stop
@@ -98,17 +100,37 @@ Function handle_mpegurl_data(request as Object, socket as Object)
     while request.body.Count() > 0
         info = read_line(request)
         print "Line: " ; info
-        if left(info, 1) <> "#" Then
-            ' Ok, we have a stream. Just pick the first one and go with it
-            new_path = path_prefix(request) + info
+        if starts_with(info, "#EXT-X-STREAM-INF:") then
+            ' Ok, this is a link to another stream. Assume this is the only one of interest
+            suffix = read_line(request)
+            new_path = path_prefix(request) + suffix
             print "New path: " ; new_path
             start_media({protocol: "http"
                              port: request.port
                          hostname: request.hostname
                              path: new_path})
-            'return send_mpegurl_request_on_socket(request, socket)
             return true
-        end if
+        else if starts_with(info, "#EXTINF:")
+            print "Increasing duration: " ; info
+            duration = duration + val(right(info, len(info) - 8))
+        end if        
     end while
-    return false
+
+    ' Ok, so presumably now we have a duration. Let's start the movie!
+    GetGlobalAA().video_duration = duration
+    print "Movie length detected to be " ; GetGlobalAA().video_duration ; " seconds"
+    content = {}
+    play_start = Int(GetGlobalAA().video_duration * GetGlobalAA().current_video_fraction)
+    print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
+    content.Stream = { url:GetGlobalAA().current_video_url
+                   quality:false
+                 contentid:"airplay-content"}
+    content.length = int(GetGlobalAA().video_duration)
+    content.playstart = play_start
+    content.StreamFormat = "hls" ' Apparently. This caught me out a few times!
+    GetGlobalAA().video_state = 0
+    aa = GetGlobalAA()
+    aa.video_screen.setContent(content)
+    aa.video_screen.Pause()
+    return true
 End Function

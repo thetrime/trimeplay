@@ -195,3 +195,7 @@ Sub handle_tcp(connection as Object)
     End If
 End Sub
 
+
+Function starts_with(source as String, prefix as String)
+    return left(source, len(prefix)) = prefix
+End Function
