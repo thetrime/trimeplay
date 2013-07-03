@@ -14,6 +14,7 @@ Things that work:
    * Viewing videos from third parties, such as youtube (Again, only without DRM)
    * Pausing and resuming video
    * Stopping videos
+   * Playing some videos from websites such as PBS.org (whether it works depends on the format of the video somewhat)
 
 What does not (because either it never will or I have no interest in doing it)
    * Anything with DRM
@@ -23,12 +24,10 @@ What does not (because either it never will or I have no interest in doing it)
 
 What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
-   * Sockets are not correctly cleaned up. See the fixme in trimeplay.brs
    * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
 
 What could be done
-   * Parsing m3u8 files (sbs, for example)
-   * non-mp4 Quicktime support? (Trailers app)
+   * Support some other formats for videos (Trailers app, though the problem here might be that it knows we aren't an AppleTV somehow)
 
 LICENSE:
 
