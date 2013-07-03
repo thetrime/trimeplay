@@ -1,13 +1,14 @@
 Sub give_up()
-        content = {}
-        content.Stream = { url:GetGlobalAA().current_video_url
-                       quality:false
-                     contentid:"airplay-content"}
-        content.StreamFormat = "hls"
-        GetGlobalAA().video_state = 0
-        aa = GetGlobalAA()
-        aa.video_screen.setContent(content)
-        aa.video_screen.Pause()
+    print "Cannot determine media length :("    
+    content = {}
+    content.Stream = { url:GetGlobalAA().current_video_url
+                   quality:false
+                 contentid:"airplay-content"}
+    content.StreamFormat = "hls"
+    GetGlobalAA().video_state = 0
+    aa = GetGlobalAA()
+    aa.video_screen.setContent(content)
+    aa.video_screen.Pause()
 End Sub
 
 
@@ -75,8 +76,8 @@ Function process_media_type(reply as Object, socket as Object)
     ' No, this is the real deal
     ' Heuristic time. First, if the header tells us, great
     if Lcase(reply.headers["content-type"]) = "application/vnd.apple.mpegurl" then
-        give_up()
-        'load_mpegurl(reply, socket)
+        'give_up()
+        load_mpegurl(reply, socket)
     else
         ' Ok, so how about the body?
         if reply.body[4] = 102 and reply.body[5] = 116 and reply.body[6] = 121 and reply.body[7] = 112 then
