@@ -39,10 +39,9 @@ Function Main()
 
     default_screen.show()
 
-    m.reversals = {}
+    m.reverse_connection = invalid
     m.connections = {}
     m.sockets = {}
-    http_requests = {}
     udp = createobject("roDatagramSocket")
     udp.setMessagePort(msgPort)
 
@@ -135,13 +134,14 @@ Function Main()
                 ' If connection is invalid, what does that mean?
                 if connection <> invalid
                     ' FIXME: Is this still right since I added the mp4 stuff? Do we actually correctly close sockets?
-                    if connection.isReadable() and connection.getCountRcvBuf() = 0 and not connection.isWritable() Then
+                    if connection.isReadable() and connection.getCountRcvBuf() = 0 Then
                         ' Apparently this means the connection has been closed
                         ' What a terrible way to indicate it
                         print "Connection is closed"
                         connection.close()
                         m.sockets[Stri(event.getSocketID())] = invalid
-                    Else
+                    Else                    
+                        'print "tcp " ; event.getSocketID() ; connection.eOK() ; connection.status() ; connection.isConnected() ; connection.isReadable() ; connection.getCountRcvBuf() = 0
                         handle_tcp(connection)
                     End If
                 else 

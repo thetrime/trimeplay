@@ -1,3 +1,16 @@
+Sub give_up()
+        content = {}
+        content.Stream = { url:GetGlobalAA().current_video_url
+                       quality:false
+                     contentid:"airplay-content"}
+        content.StreamFormat = "hls"
+        GetGlobalAA().video_state = 0
+        aa = GetGlobalAA()
+        aa.video_screen.setContent(content)
+        aa.video_screen.Pause()
+End Sub
+
+
 Sub start_media(url as Object)
     ' Hokay. First, we don't even know the media type. Let's open a connection so we can ask about it
     print "Loading media parameters for " ; url
@@ -24,6 +37,7 @@ Sub start_media(url as Object)
 End Sub
 
 Function get_media_type(request as Object, socket as Object)
+    socket.notifyWritable(false)
     reply = create_new_reply()
     reply.process_data = process_media_type
 
@@ -40,7 +54,6 @@ Function get_media_type(request as Object, socket as Object)
     ' iOS just disconnects if I ask for HEAD. Worse, everything is reported to be content-type: application/octet-stream. Great.
     msg = "GET " + request.path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + request.hostname + chr(13) + chr(10) + "Range: bytes=0-8" + chr(13) + chr(10) + chr(13) + chr(10)
     print msg
-    socket.notifyWritable(false)
     packet.fromAsciiString(msg)
     print socket.send(packet, 0, packet.Count())
     return false ' Do not try to process media type yet, though, since we don't have it!
@@ -61,8 +74,9 @@ Function process_media_type(reply as Object, socket as Object)
 
     ' No, this is the real deal
     ' Heuristic time. First, if the header tells us, great
-    if Lcase(reply.headers["content-type"]) = "something" then
-        stop
+    if Lcase(reply.headers["content-type"]) = "application/vnd.apple.mpegurl" then
+        give_up()
+        'load_mpegurl(reply, socket)
     else
         ' Ok, so how about the body?
         if reply.body[4] = 102 and reply.body[5] = 116 and reply.body[6] = 121 and reply.body[7] = 112 then
@@ -70,8 +84,13 @@ Function process_media_type(reply as Object, socket as Object)
             print "MP4 signature detected"
             load_mp4_file(reply, socket)
         else
+            print reply.headers["content-type"]
+            print reply.body.toAsciiString()
             print "Unknown file type :("
-            stop
+            url = "http://" + reply.hostname + ":" + reply.port.toStr() + reply.path
+            print "Playing anyway: " ; url
+            ' Well, we could give up here, or we could just start from the beginning
+            give_up()
         end if
     end if
     return false

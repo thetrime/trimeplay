@@ -14,9 +14,9 @@ Function send_event(key as String, value as String)
     packet = packet + "Content-Type: text/x-apple-plist+xml" + chr(13) + chr(10)
     packet = packet + "Content-Length: " +str(Len(data)) + chr(13) + chr(10)
     packet = packet + chr(13) + chr(10) + data
-    print packet
+    print packet ; " ----> " ; m.reverse_connection.getID()
     bytes.fromAsciiString(packet)
-    m.current_connection.send(bytes, 0, bytes.Count())
+    m.reverse_connection.send(bytes, 0, bytes.Count())
 End Function
 
 Function read_http_reply(reply as Object, connection as Object)
@@ -49,7 +49,8 @@ Function read_http_reply(reply as Object, connection as Object)
     return reply.state = 7
 End Function
 
-Function parse_http_status(connection as Object, reply as Object)
+Function parse_http_status(connection as Object, reply as Object)  
+     print "Parsing message on " ; connection.getId()
      While reply.buffer.Count() > 0
         code = reply.buffer.Shift()
         if code = 10 then
@@ -66,8 +67,12 @@ Function parse_http_status(connection as Object, reply as Object)
     End While
 End Function
 
-Function handle_http_reverse(connection as Object, reply as Object)
-    print "HTTP Reply received for reverse?"
+Function handle_http_reverse(reply as Object, connection as Object)
+    ' Just ignore them.
+    ' But create a new reply object so that we can handle the next message correctly    
+    print "Got reverse reply on " ; connection.getId()
+    GetGlobalAA().connections[Stri(connection.getId())] = create_new_reply()
+    return false
 End Function
 
 Function create_new_reply()

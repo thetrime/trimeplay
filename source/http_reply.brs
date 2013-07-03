@@ -6,14 +6,13 @@ Function handle_fairplay(http as Object, connection as Object)
     return status    
 End Function
 
-' FIXME: New architecture breaks this. There is no m.reversals
 Function handle_reverse(http as Object, connection as Object)
     reply = createobject("roByteArray")
     reply.fromAsciiString("HTTP/1.1 101 Switching Protocols" + chr(13) + chr(10) + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10) + "Upgrade: PTTH/1.0" + chr(13) + chr(10) + "Connection: Upgrade" + chr(13) + chr(10) + chr(13) + chr(10))
     status = connection.send(reply, 0, reply.Count())
     print "Reversal on: " ; connection.getID()
-    m.reversals[Stri(connection.getID())] = connection
-    m.current_connection = connection
+    GetGlobalAA().reverse_connection = connection
+    GetGlobalAA().connections[Stri(connection.getId())] = create_new_reply()
     return status
 End Function
 
