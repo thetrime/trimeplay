@@ -1,14 +1,14 @@
-Sub give_up()
-    print "Cannot determine media length :("    
+Sub give_up(format as String)
+    print "Cannot determine media length :( Assuming it is " ; format ; " from " ; GetGlobalAA().current_video_url
     content = {}
     content.Stream = { url:GetGlobalAA().current_video_url
                    quality:false
                  contentid:"airplay-content"}
-    content.StreamFormat = "hls"
+    content.StreamFormat = format
     GetGlobalAA().video_state = 0
     aa = GetGlobalAA()
     aa.video_screen.setContent(content)
-    aa.video_screen.Pause()
+    aa.video_screen.Pause()   
 End Sub
 
 
@@ -53,7 +53,7 @@ Function get_media_type(request as Object, socket as Object)
     packet = createobject("roByteArray")
     ' Originally I wanted to do HEAD here, and examine the content-type. Well, guess what? 
     ' iOS just disconnects if I ask for HEAD. Worse, everything is reported to be content-type: application/octet-stream. Great.
-    msg = "GET " + request.path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + request.hostname + chr(13) + chr(10) + "Range: bytes=0-8" + chr(13) + chr(10) + chr(13) + chr(10)
+    msg = "GET " + request.path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + request.hostname + chr(13) + chr(10) + "Range: bytes=0-8" + chr(13) + chr(10) + "User-agent: QuickTime" + chr(13) + chr(10) + chr(13) + chr(10)
     print msg
     packet.fromAsciiString(msg)
     print socket.send(packet, 0, packet.Count())
@@ -75,8 +75,8 @@ Function process_media_type(reply as Object, socket as Object)
 
     ' No, this is the real deal
     ' Heuristic time. First, if the header tells us, great
-    if Lcase(reply.headers["content-type"]) = "application/vnd.apple.mpegurl" then
-        'give_up()
+    content_type = reply.headers["content-type"]
+    if content_type <> invalid and Lcase(content_type) = "application/vnd.apple.mpegurl" then
         load_mpegurl(reply, socket)
     else
         ' Ok, so how about the body?
@@ -91,7 +91,7 @@ Function process_media_type(reply as Object, socket as Object)
             url = "http://" + reply.hostname + ":" + reply.port.toStr() + reply.path
             print "Playing anyway: " ; url
             ' Well, we could give up here, or we could just start from the beginning
-            give_up()
+            give_up("hls")
         end if
     end if
     return false

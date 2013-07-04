@@ -162,6 +162,13 @@ Function Main()
             else if event.isResumed()
                send_event("state", "playing")
                m.video_state = 1 ' playing
+            else if event.isRequestFailed()            
+               print "Request failed: " ; event.GetMessage() ; event.GetInfo() ; event.GetIndex()        
+            else if event.isStatusMessage()            
+               print "Status message: " ; event.GetMessage()               
+
+            else 
+               print "Unexpected roVideoScreenEvent"
             End If
             'print "Position is now "; m.video_position 
         Else

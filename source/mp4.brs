@@ -14,6 +14,7 @@ End Function
 
 Function handle_mp4_data(request as Object, socket as Object)
     print "Got some delicious MP4 data!"
+    print request.headers
     ' Read the length of the atom as a string, because otherwise brightscript will screw it up :(
     atom_length = add_byte("0", request.body.shift())
     atom_length = add_byte(atom_length, request.body.shift())
@@ -49,6 +50,41 @@ Function handle_mp4_data(request as Object, socket as Object)
         end if
         new_end = add_strings(new_start, "1024")
         return continue_loading_mp4(request, socket, new_start, new_end)
+    else if atom_name = "cmov" then
+        ' compressed metadata -_-
+        ' To decompress we need two child atoms: dcom (which specifies the compression algorithm) and cmvd, which is the data
+        ' We should have at least the first bit already in the 1024 bytes we grabbed
+        
+        ' First we have the dcom atom length, which is always 12
+        request.body.shift()
+        request.body.shift()
+        request.body.shift()
+        request.body.shift()
+        ' Then we should have the dcom atom
+        dcom = chr(request.body.shift())
+        dcom = dcom + chr(request.body.shift())
+        dcom = dcom + chr(request.body.shift())
+        dcom = dcom + chr(request.body.shift())
+        if dcom <> "dcom" then
+            print "Unexpected atom " ; dcom        
+            give_up("mp4")
+            return true
+        end if
+        ' Then the actual compression method, 4 bytes
+        dcom = chr(request.body.shift())
+        dcom = dcom + chr(request.body.shift())
+        dcom = dcom + chr(request.body.shift())
+        dcom = dcom + chr(request.body.shift())
+        print "Movie metadata is compressed with " ; dcom        
+        if dcom = "zlib" then
+            print "This is just too hard"
+            give_up("mp4")
+            return true
+        else
+            print "Unknown compression algorithm"
+            give_up("mp4")
+            return true
+        end if        
     else if atom_name = "mvhd" then
         ' Sweet. Now we can get the data we crave!
         timescale = (((((request.body[12] * 256) + request.body[13]) * 256) + request.body[14]) * 256) + request.body[15]
@@ -140,7 +176,7 @@ Function send_mp4_request_on_socket(request as Object, socket as Object)
         reply.start_byte = request.start_byte  
         reply.end_byte = request.end_byte
         packet = createobject("roByteArray")
-        msg = "GET " + request.path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + request.hostname + chr(13) + chr(10) + "Range: bytes=" + request.start_byte +"-" + request.end_byte + chr(13) + chr(10) + chr(13) + chr(10)
+        msg = "GET " + request.path + " HTTP/1.1" + chr(13) + chr(10) + "Host: " + request.hostname + chr(13) + chr(10) + "Range: bytes=" + request.start_byte +"-" + request.end_byte + chr(13) + chr(10) + "User-agent: QuickTime" + chr(13) + chr(10) + chr(13) + chr(10)
         print msg
         packet.fromAsciiString(msg)
         socket.send(packet, 0, packet.Count())

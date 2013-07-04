@@ -45,7 +45,7 @@ Function read_http_reply(reply as Object, connection as Object)
     else if reply.state = 6 Then
         parse_http_body(connection, reply)
     end if
-    print "Reading http reply.... " ; reply.state ; "(length was " ; length ; ")"
+    'print "Reading http reply.... " ; reply.state ; "(length was " ; length ; ")"
     return reply.state = 7
 End Function
 

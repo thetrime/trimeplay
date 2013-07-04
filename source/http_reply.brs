@@ -157,6 +157,7 @@ Function handle_play(http as Object, connection as Object)
     End If
     if m.state <> "video" Then
         m.video_screen = createobject("roVideoScreen")
+        m.video_screen.AddHeader("user-agent", "QuickTime")
         m.video_screen.SetPositionNotificationPeriod(1)
         m.video_screen.SetMessagePort(m.port)
         If m.state = "photo" then
@@ -169,6 +170,7 @@ Function handle_play(http as Object, connection as Object)
     ' We need to get the length of the video. This is incredibly difficult, despite the fact that the Roku KNOWS it
     ' There is apparently a request to provide this in the future. But tomorrow is always a day away...
     print "Url: " ; params["content-location"]
+    print params
     m.current_video_url = params["content-location"]
     if type(params["start-position"]) = "String" then
         m.current_video_fraction = val(params["start-position"])

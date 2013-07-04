@@ -21,13 +21,17 @@ What does not (because either it never will or I have no interest in doing it)
       * That includes mirroring, surprisingly! That's a shame really: I might try and get mirroring off the never-to-be-done list, but it seems unlikely to happen :(
    * Slideshow transitions (Don't care)
    * Music (not really interested. The protocol is very complicated, which is surprising given how simple video is?)
+   * Videos with cmov atoms. Roku can't play them. This is annoying and stupid, since it's hardly difficult if you have access to zlib, which roku must, but that seems to be the end of it.
 
 What doesn't work *but should* (ie, bugs)
    * Sometimes the airplay capability disappears from the network. Not sure why (yet)
    * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
 
 What could be done
-   * Support some other formats for videos (Trailers app, though the problem here might be that it knows we aren't an AppleTV somehow)
+   * Support some other formats for videos
+
+What I haven't tested
+   * Connecting more than one iDevice at once. It will probably just crash/freeze/choke in some other way
 
 LICENSE:
 
