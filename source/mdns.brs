@@ -6,9 +6,10 @@ Sub respond_to_dns(dns as Object, udp as Object)
         For Each part in question
             uri = uri + part + "."
         End For
-        'print "Query received for " ; uri
-        If uri = "_raop._tcp.local." or uri = "._airplay." or uri = "_services._dns-sd._udp.local." Then
+        print "Query received for " ; uri
+        If uri = "_raop._tcp.local." or uri = "_airplay." or uri = "_raop." or uri = "_services._dns-sd._udp.local." or  uri = "roku._airplay._tcp.local." Then 
             announce = announce_packet()
+            print "Announcing...."
             result = udp.send(announce, 0, announce.Count())
         End If
     End For

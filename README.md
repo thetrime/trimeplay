@@ -24,11 +24,14 @@ What does not (because either it never will or I have no interest in doing it)
    * Videos with cmov atoms. Roku can't play them. This is annoying and stupid, since it's hardly difficult if you have access to zlib, which roku must, but that seems to be the end of it.
 
 What doesn't work *but should* (ie, bugs)
-   * Sometimes the airplay capability disappears from the network. Not sure why (yet)
    * the screensaver will still come on if you're looking at a photo. I don't know if this is a bug or a feature?
 
 What could be done
    * Support some other formats for videos
+      * In theory, I could transcode the cmov movies into mov ones in brightscript by decompressing the moov atom.
+         * Then again, perhaps I should be charging the people at Brightsign to do this?! :S
+   * I should probably send a packet out if the channel exits to kill the airplay announcement. Can I, though? It doesn't look like there is any opportunity 
+   * Eval() may be able to be used to catch some errors at the expense of making everything much slower. Might still be fast enough? Maybe I can call Eval() on the top level?
 
 What I haven't tested
    * Connecting more than one iDevice at once. It will probably just crash/freeze/choke in some other way
