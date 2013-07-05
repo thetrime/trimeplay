@@ -19,7 +19,7 @@ End Function
 Function handle_server_info(http as Object, connection as Object)
     ' Really? You cannot escape quotes?!
     device_id = "<string>" + m.mac + "</string>"
-    features = "  <integer>" + m.features + "</integer>"
+    features = "  <integer>" + m.features_dec + "</integer>"
 
     return send_http_reply(connection, "text/x-apple-plist+xml", list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
                                                                                             "<!DOCTYPE plist PUBLIC " + chr(34) + "-//Apple//DTD PLIST 1.0//EN" + chr(34) + " " + chr(34) + "http://www.apple.com/DTDs/PropertyList-1.0.dtd" + chr(34) + ">",
@@ -360,6 +360,8 @@ Function dispatch_http(http as Object, connection as Object)
         status = handle_fairplay(http, connection)
     Else If http.path = "/getProperty" Then
         status = handle_get_property(http, connection)
+    Else If http.path = "/proxy" Then
+        status = handle_proxy(http, connection)
     Else
         print "Unexpected URI: "; http.path ; " on " ; connection.getID()
     End If

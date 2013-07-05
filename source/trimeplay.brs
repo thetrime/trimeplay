@@ -15,10 +15,17 @@
 
 
 Function Main()
+    'ztest()
     msgPort = createobject("roMessagePort") 
     m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
-    m.features = "3"
-    'm.features = "0x39f7"
+    'm.features_hex = "0x3"
+    'm.features_dec = "3"
+    'm.features_hex = "0x39f7"
+    'm.features_dec = "14839"
+
+    m.features_hex = "0x3fff"
+    m.features_dec = "16383"
+
     ' Set up some stuff so we can display screens later in the http handlers
     m.port = msgPort
     m.state = "none"
@@ -95,7 +102,7 @@ Function Main()
         'print "Waiting in main loop"
         event = wait(0, msgPort)
         If type(event)="roSocketEvent"
-            'print "Got event on " ; event.getSocketID()
+            print "Got event on " ; event.getSocketID()
             If event.getSocketID() = udp.getID()
                 If udp.isReadable()
                    message = createobject("roByteArray")
@@ -185,8 +192,10 @@ Sub handle_tcp(connection as Object)
         request = create_new_request()        
         m.connections[Stri(connection.getID())] = request
     End if
+    print "Reading some stuff"
     status = request.read_data(request, connection)
     If status = false Then ' More data is required
+       print "Not yet finished"
        return
     Else if status = true Then 'Data is complete. Execute handler
         ' Regardless of whether the socket is to be closed, the HTTP request has finished. We have to invalidate it here

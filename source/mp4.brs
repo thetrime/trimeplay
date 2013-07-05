@@ -228,7 +228,11 @@ Function parse_moov_file(bytes as Object)
         content = {}
         play_start = Int(GetGlobalAA().video_duration * GetGlobalAA().current_video_fraction)
         print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
-        content.Stream = { url:GetGlobalAA().current_video_url
+        ' Now, we cannot simply pass the URL to roku, because it will choke on the cmov. Instead, pretend WE are the host
+        ' When we get this request, we are going to have to stitch in the decompressed moov atom on the fly
+        proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url
+
+        content.Stream = { url:proxy_url
                        quality:false
                      contentid:"airplay-content"}
         content.length = int(GetGlobalAA().video_duration)

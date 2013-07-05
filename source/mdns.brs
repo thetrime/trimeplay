@@ -123,7 +123,7 @@ Function announce_packet()
 '-----------------------------------------------------------------------------------------------------------
     data = [{qname:["roku", "_airplay", "_tcp", "local"],
               text:["deviceid=" + m.mac,
-                    "features=" + m.features,
+                    "features=" + m.features_hex,
                     "model=AppleTV2,1"
                     "srcvers=101.28"]},
 

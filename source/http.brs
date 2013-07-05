@@ -14,8 +14,8 @@ End Function
 
 Function read_http(request as Object, connection as Object)
     length = connection.getCountRcvBuf()
-    'print "Processing message on socket: " ; connection.getID() ; " of length " ; length
-    If request.state < 6 Then
+    print "Processing message on socket: " ; connection.getID() ; " of length " ; length
+    If request.state < 6 or request.body_handler <> invalid then
         request.buffer[length-1] = 0
         request.buffer[length-1] = invalid
         r = connection.receive(request.buffer, 0, length)
@@ -42,12 +42,15 @@ Function read_http(request as Object, connection as Object)
     Else If request.state = 6 Then
        parse_http_body(connection, request)
     End If
-    'print "Final state is " ; request.state
+    print "Final state is " ; request.state
     return request.state = 7
 End Function
 
 
 Function parse_http_body(connection as Object, request as Object)
+    if request.body_handler <> invalid then
+        return request.body_handler(request, connection)
+    end if
     While request.buffer.Count() > 0
         request.body.Push(request.buffer.Shift())
         request.body_size = request.body_size + 1

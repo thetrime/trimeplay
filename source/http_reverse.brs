@@ -28,10 +28,15 @@ Function read_http_reply(reply as Object, connection as Object)
          connection.close()
          return false
     End If
-    If reply.state < 6 Then
+    If reply.state < 6 or reply.body_handler <> invalid then
+        reply.buffer.Clear() ' Wow. The socket interface just keeps getting worse!
         reply.buffer[length-1] = 0
         reply.buffer[length-1] = invalid
         r = connection.receive(reply.buffer, 0, length)
+        if r <> length then
+            print "Read " ; r ; " instead of " ; length
+            stop
+        end if
     Else        
         reply.body[reply.content_length-1] = 0
         reply.body[reply.content_length-1] = invalid
