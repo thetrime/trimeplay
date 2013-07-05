@@ -52,34 +52,53 @@ Function handle_mp4_data(request as Object, socket as Object)
         return continue_loading_mp4(request, socket, new_start, new_end)
     else if atom_name = "cmov" then
         ' compressed metadata -_-
-        ' To decompress we need two child atoms: dcom (which specifies the compression algorithm) and cmvd, which is the data
-        ' We should have at least the first bit already in the 1024 bytes we grabbed
-        
-        ' First we have the dcom atom length, which is always 12
-        request.body.shift()
-        request.body.shift()
-        request.body.shift()
-        request.body.shift()
-        ' Then we should have the dcom atom
-        dcom = chr(request.body.shift())
-        dcom = dcom + chr(request.body.shift())
-        dcom = dcom + chr(request.body.shift())
-        dcom = dcom + chr(request.body.shift())
-        if dcom <> "dcom" then
-            print "Unexpected atom " ; dcom        
-            give_up("mp4")
-            return true
+        ' To decompress we need two child atoms: dcom (which specifies the compression algorithm) and cmvd, which is the data.
+        ' Grab it all in one go
+        if atom_length = "1" then
+            ' Skip 64-bit extension size too
+            new_start = add_strings(request.start_byte, "16")
+        else
+            new_start = add_strings(request.start_byte, "8")
         end if
-        ' Then the actual compression method, 4 bytes
+        new_end = add_strings(new_start, atom_length)
+        return continue_loading_mp4(request, socket, new_start, new_end)
+    else if atom_name = "dcom"
+        ' First is actual compression method, 4 bytes
         dcom = chr(request.body.shift())
         dcom = dcom + chr(request.body.shift())
         dcom = dcom + chr(request.body.shift())
         dcom = dcom + chr(request.body.shift())
-        print "Movie metadata is compressed with " ; dcom        
+        print "Movie metadata is compressed with " ; dcom     
+
+        ' Next is the cmvd atom, always of length 12
+        request.body.shift()
+        request.body.shift()
+        request.body.shift()
+        request.body.shift()
+        ' and then the atom
+        cmvd = chr(request.body.shift())
+        cmvd = cmvd + chr(request.body.shift())
+        cmvd = cmvd + chr(request.body.shift())
+        cmvd = cmvd + chr(request.body.shift())
+        print "cmvd: " ; cmvd       
+        ' then the uncompressed size
+        uncompressed_size = add_byte("0", request.body.shift())
+        uncompressed_size = uncompressed_size + add_byte("0", request.body.shift())
+        uncompressed_size = uncompressed_size + add_byte("0", request.body.shift())
+        uncompressed_size = uncompressed_size + add_byte("0", request.body.shift())
+        ' Finally, we have the data!
         if dcom = "zlib" then
-            print "This is just too hard"
-            give_up("mp4")
+            ' Ignore the DEFLATE header of (probably) 120 156
+            print request.body.shift()
+            print request.body.shift()  
+            inflated = inflate(request.body)
+            ' Supeyb. Save this for later in a temporary file
+            inflated.WriteFile("tmp:/moov.dat")
+            parse_moov_file(inflated)
             return true
+            'print "This is just too hard"
+            'give_up("mp4")
+            'return true
         else
             print "Unknown compression algorithm"
             give_up("mp4")
@@ -130,8 +149,6 @@ Function continue_loading_mp4(reply as Object, socket as Object, new_start as St
         return false ' Do not close the socket
     end if
 End Function
-
-
 
 Sub load_mp4_parameters(hostname as String, port as integer, path as String, start_byte as String, end_byte as String)
     print "Loading mp4 parameters for " ; hostname ; " on port " ; port ; " on path " ;path
@@ -187,4 +204,45 @@ Function send_mp4_request_on_socket(request as Object, socket as Object)
         load_mp4_parameters(request.hostname, request.port, request.path, request.start_byte, request.end_byte)
         return true
     End If
+End Function
+
+
+Function parse_moov_file(bytes as Object)
+    atom_length = bytes.Shift()
+    atom_length = atom_length * 256 + bytes.Shift()
+    atom_length = atom_length * 256 + bytes.Shift()
+    atom_length = atom_length * 256 + bytes.Shift()
+
+    atom_name = chr(bytes.shift())
+    atom_name = atom_name + chr(bytes.shift())
+    atom_name = atom_name + chr(bytes.shift())
+    atom_name = atom_name + chr(bytes.shift())
+    
+    if atom_name = "moov" then
+        parse_moov_file(bytes)
+    else if atom_name = "mvhd" then
+        timescale = (((((bytes[12] * 256) + bytes[13]) * 256) + bytes[14]) * 256) + bytes[15]
+        duration = (((((bytes[16] * 256) + bytes[17]) * 256) + bytes[17]) * 256) + bytes[19]
+        GetGlobalAA().video_duration = duration / timescale
+        print "Movie length detected to be " ; GetGlobalAA().video_duration ; " seconds"
+        content = {}
+        play_start = Int(GetGlobalAA().video_duration * GetGlobalAA().current_video_fraction)
+        print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
+        content.Stream = { url:GetGlobalAA().current_video_url
+                       quality:false
+                     contentid:"airplay-content"}
+        content.length = int(GetGlobalAA().video_duration)
+        content.playstart = play_start
+        content.StreamFormat = "mp4"
+        GetGlobalAA().video_state = 0
+        aa = GetGlobalAA()
+        aa.video_screen.setContent(content)
+        aa.video_screen.Pause()
+    else
+        ' Is this really the only way to truncate an array? :(
+        For i = 1 to atom_length
+            bytes.Shift()
+        end for
+        parse_moov_file(bytes)
+    end if
 End Function
