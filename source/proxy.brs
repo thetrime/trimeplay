@@ -69,7 +69,8 @@ Function flush_proxy(reply as Object, connection as Object)
         buffer = source.unsent_buffers[0].buffer
         length = source.unsent_buffers[0].buffer.count() - source.unsent_buffers[0].from
         'debug_buffer("case 1", buffer, source.unsent_buffers[0].from)
-        sent = connection.send(buffer, source.unsent_buffers[0].from, length)
+        sent = forward_data(connection, buffer, source.unsent_buffers[0].from, length, source)
+        'sent = connection.send(buffer, source.unsent_buffers[0].from, length)
         if sent = length then
            source.sent = source.sent + sent
            source.unsent_buffers.shift()
@@ -93,6 +94,7 @@ Function flush_proxy(reply as Object, connection as Object)
         connection.notifyWritable(false)
     else
         ' There are pending buffers. We want to know when time is up
+        ' FIXME: Could also set the other socket to notifyReadable(false) if there are too many buffers to slow down
         connection.notifyWritable(true)
     end if
     return false
@@ -119,7 +121,8 @@ Function proxy_data(reply as Object, connection as Object)
         if reply.slave.isWritable() then
             'print "-------------------------Case 2 at " ; reply.sent
             'debug_buffer("case 3", reply.buffer, 0)
-            sent = reply.slave.send(reply.buffer, 0, reply.buffer.count())
+            'sent = reply.slave.send(reply.buffer, 0, reply.buffer.count())
+            sent = forward_data(reply.slave, reply.buffer, 0, reply.buffer.count(), reply)
             'print sent
         else
             sent = 0
@@ -159,4 +162,8 @@ Function debug_buffer(info as String, buffer as Object, offset as Integer)
         dbg = dbg + chr(buffer[offset + i])
     end For
     print info ; " ( " ; dbg ; " ) "
+End Function
+
+Function forward_data(socket as Object, buffer as Object, offset as Integer, length as Integer, source as Object)
+    return socket.send(buffer, offset, length)
 End Function
