@@ -91,6 +91,9 @@ Function flush_proxy(reply as Object, connection as Object)
     if source.unsent_buffers.count() = 0 then
         ' We have successfully flushed the entire queue! Therefore we no longer care if we are writable
         connection.notifyWritable(false)
+    else
+        ' There are pending buffers. We want to know when time is up
+        connection.notifyWritable(true)
     end if
     return false
 End Function
@@ -110,38 +113,7 @@ Function proxy_data(reply as Object, connection as Object)
         reply.slave.sendStr(chr(13) + chr(10))
         reply.proxy_state = 1
     end if
-    ' Send any unsent data (can't I replace all of this with a call to flush_proxy(something, reply.slave) ?
-    'print "Read " ; reply.buffer.Count() ; " / " ; reply.content_length ; " bytes from the source"
-    while reply.unsent_buffers.count() > 0 and reply.slave.isWritable()
-        'print "There are " ; reply.unsent_buffers.count(); " unsent buffers"
-        buffer = reply.unsent_buffers[0].buffer
-        length = reply.unsent_buffers[0].buffer.count() - reply.unsent_buffers[0].from
-        print "-------------------------Case 1 at " ; reply.sent
-        'debug_buffer("case 2", buffer, reply.unsent_buffers[0].from)
-        sent = reply.slave.send(buffer, reply.unsent_buffers[0].from, length)        
-        'print "----------> " ; sent
-        if sent = length then
-           reply.sent = reply.sent + sent
-           reply.unsent_buffers.shift()
-        else if sent = -1 then      
-            if reply.slave.eWouldBlock() ' Makes me wonder just what isWritable does?
-                ' We still have to save the current buffer or we will lose it
-                backing_buffer = createobject("roByteArray")
-                backing_buffer.append(reply.buffer)
-                'print "Adding new unsent buffer, starting from zero"
-                reply.unsent_buffers.push({buffer: backing_buffer,
-                                             from: 0})
-                reply.slave.notifyWritable(true)
-                return false ' We just have to try again later
-            end if            
-            stop
-        else
-            reply.unsent_buffers[0].from = reply.unsent_buffers[0].from + sent
-            reply.sent = reply.sent + sent
-            reply.slave.notifyWritable(true)
-           return false
-        end if        
-    end while
+    flush_proxy({source:reply}, reply.slave)
     if reply.buffer.count() > 0 then
         'print "Buffer contains " ; reply.buffer.count() ; " bytes"
         if reply.slave.isWritable() then
