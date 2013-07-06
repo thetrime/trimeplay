@@ -81,6 +81,39 @@ Function multiply_string(a as String, b as String)
     return result
 End Function
 
+' Add subtract numbers
+Function subtract_strings(a as String, b as String)
+    carry = 0
+    ' Assumption is that A > B
+    aa = createobject("roByteArray")
+    bb = createobject("roByteArray")
+    c = createobject("roByteArray")
+    aa.fromAsciiString(a)
+    bb.fromAsciiString(b)
+    While aa.count() > 0
+        aaa = aa.pop() - 48
+        if bb.count() > 0 then
+            bbb = bb.pop() - 48
+        else
+            bbb = 0
+        end if
+        difference = aaa - bbb - carry
+        if difference < 0 then
+            carry = 1
+            difference = difference + 10
+        else
+            carry = 0
+        end if
+        c.UnShift(difference + 48)
+    End While
+    ' The carry really should be 0 here or A < B
+    ' trim leading zeroes
+    while c[0] = 48
+        c.shift()
+    end while
+    return c.toAsciiString()
+End Function
+
 ' This is for importing a number from an N-byte hex value into a string
 Function add_byte(a as String, b as Integer)
     f = multiply_string(a, "256")
