@@ -1,6 +1,10 @@
 Function handle_proxy(http as Object, connection as Object)
     ' Ok. First, get a handle to the original connection
     real_url = parse_url(http.search["original_url"])
+    delta = http.search["delta"]
+    if delta = invalid then
+       delta = 0
+    end if
     socket = createobject("roStreamSocket")
     socket.setMessagePort(GetGlobalAA().port)
     mp4_addr = CreateObject("roSocketAddress")
@@ -12,6 +16,7 @@ Function handle_proxy(http as Object, connection as Object)
     reply.read_data = send_proxy_request
     reply.slave = connection
     reply.url = real_url
+    reply.delta = delta
     socket.setSendToAddress(mp4_addr)
     socket.notifyReadable(true)
     socket.notifyWritable(true)
@@ -33,6 +38,7 @@ Function send_proxy_request(request as Object, socket as Object)
         reply.slave = request.slave
         reply.slave.notifyReadable(false)
         reply.sent = 0
+        reply.delta = request.delta
         slave_connection = create_new_reply()
         slave_connection.read_data = flush_proxy
         slave_connection.source = reply
@@ -50,42 +56,6 @@ Function send_proxy_request(request as Object, socket as Object)
         print "Hangup detected?"
         stop
     End If
-End Function
-
-Function read_proxy_reply(reply as Object, connection as Object)
-    length = connection.getCountRcvBuf()
-    if length = 0 then
-         print "Unexpected EOF"
-         GetGlobalAA().connections[Stri(connection.getID())] = invalid
-         GetGlobalAA().sockets[Stri(connection.getID())] = invalid
-         connection.close()
-         return false
-    End If
-    reply.buffer[length-1] = 0
-    reply.buffer[length-1] = invalid
-    r = connection.receive(reply.buffer, 0, length)
-    if reply.state = 6 then
-        reply.body_size = reply.body_size + length
-    end if
-    if reply.state = 0 then
-        parse_http_status(connection, reply)
-    else if reply.state = 1 then
-        parse_http_headers(connection, reply)
-    end if
-    if reply.state > 5 Then        
-        ' We have to ship this to the slave connection. First, anything in the reply.body, then everything in reply.buffer
-        if reply.body.count() <> 0 then
-            ' FIXME: May not succeed
-            reply.slave.send(reply.body, 0, reply.body.count())
-        end if
-        ' FIXME: May not succeed
-        reply.slave.send(reply.buffer, 0, reply.buffer.count())
-        if reply.body_size >= reply.content_length then
-            reply.state = 7
-        end if
-    end if
-    'print "Reading http reply.... " ; reply.state ; "(length was " ; length ; ")"
-    return reply.state = 7
 End Function
 
 Function finished_proxy(reply as Object, connection as Object)
@@ -131,12 +101,16 @@ Function proxy_data(reply as Object, connection as Object)
         ' Send headers
         reply.slave.sendStr("HTTP/1.1 200 OK" + chr(13) + chr(10))
         for each header in reply.headers
-            reply.slave.sendStr(header + ": " + reply.headers[header] + chr(13) + chr(10))
+            if reply.delta <> 0 and header = "content-length" Then
+                reply.slave.sendStr(header + ": " + add_strings(delta, reply.headers[header]) + chr(13) + chr(10))
+            else
+                reply.slave.sendStr(header + ": " + reply.headers[header] + chr(13) + chr(10))
+            end if
         end for
         reply.slave.sendStr(chr(13) + chr(10))
         reply.proxy_state = 1
     end if
-    ' Send any unsent data
+    ' Send any unsent data (can't I replace all of this with a call to flush_proxy(something, reply.slave) ?
     'print "Read " ; reply.buffer.Count() ; " / " ; reply.content_length ; " bytes from the source"
     while reply.unsent_buffers.count() > 0 and reply.slave.isWritable()
         'print "There are " ; reply.unsent_buffers.count(); " unsent buffers"
@@ -160,10 +134,6 @@ Function proxy_data(reply as Object, connection as Object)
                 reply.slave.notifyWritable(true)
                 return false ' We just have to try again later
             end if            
-            print reply.slave.status()
-            print reply.slave.eOK()
-            print reply.slave.eWouldBlock()
-            print reply.slave.eSuccess()
             stop
         else
             reply.unsent_buffers[0].from = reply.unsent_buffers[0].from + sent

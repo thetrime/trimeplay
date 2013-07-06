@@ -365,6 +365,6 @@ Function dispatch_http(http as Object, connection as Object)
     Else
         print "Unexpected URI: "; http.path ; " on " ; connection.getID()
     End If
-    'print "Status: " ; status
+    print "Status: " ; status
     return false ' Keep-alive
 End Function

@@ -41,6 +41,9 @@ Function handle_mp4_data(request as Object, socket as Object)
     end if    
 
     if atom_name = "moov" then
+        request.moov_start = request.start_byte
+        request.moov_length = atom_length
+
         ' Awesome. Now we need to find the mvhd atom by descending INTO the moov atom
         if atom_length = "1" then
             ' Skip 64-bit extension size too
@@ -86,6 +89,10 @@ Function handle_mp4_data(request as Object, socket as Object)
         uncompressed_size = uncompressed_size + add_byte("0", request.body.shift())
         uncompressed_size = uncompressed_size + add_byte("0", request.body.shift())
         uncompressed_size = uncompressed_size + add_byte("0", request.body.shift())
+
+        ' We can now compute the delta
+        delta = subtract_strings(uncompressed_size, request.moov_length)
+        
         ' Finally, we have the data!
         if dcom = "zlib" then
             ' Ignore the DEFLATE header of (probably) 120 156
@@ -93,8 +100,9 @@ Function handle_mp4_data(request as Object, socket as Object)
             print request.body.shift()  
             inflated = inflate(request.body)
             ' Supeyb. Save this for later in a temporary file
-            inflated.WriteFile("tmp:/moov.dat")
-            parse_moov_file(inflated)
+            filename = "tmp:/moov.dat"
+            inflated.WriteFile(filename)
+            parse_moov_file(inflated, delta, request.moov_start, filename, request.moov_length)
             return true
             'print "This is just too hard"
             'give_up("mp4")
@@ -207,7 +215,7 @@ Function send_mp4_request_on_socket(request as Object, socket as Object)
 End Function
 
 
-Function parse_moov_file(bytes as Object)
+Function parse_moov_file(bytes as Object, moov_start as String, delta as String, filename as String, delete_length as String)
     atom_length = bytes.Shift()
     atom_length = atom_length * 256 + bytes.Shift()
     atom_length = atom_length * 256 + bytes.Shift()
@@ -219,7 +227,7 @@ Function parse_moov_file(bytes as Object)
     atom_name = atom_name + chr(bytes.shift())
     
     if atom_name = "moov" then
-        parse_moov_file(bytes)
+        parse_moov_file(bytes, moov_start, delta, filename, delete_length)
     else if atom_name = "mvhd" then
         timescale = (((((bytes[12] * 256) + bytes[13]) * 256) + bytes[14]) * 256) + bytes[15]
         duration = (((((bytes[16] * 256) + bytes[17]) * 256) + bytes[17]) * 256) + bytes[19]
@@ -230,7 +238,7 @@ Function parse_moov_file(bytes as Object)
         print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
         ' Now, we cannot simply pass the URL to roku, because it will choke on the cmov. Instead, pretend WE are the host
         ' When we get this request, we are going to have to stitch in the decompressed moov atom on the fly
-        proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url
+        proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url + "&delta=" + delta + "&edit_from=" + moov_start + "&edit_source=" + filename + "&edit_length=" + delete_length
 
         content.Stream = { url:proxy_url
                        quality:false
@@ -247,6 +255,6 @@ Function parse_moov_file(bytes as Object)
         For i = 1 to atom_length
             bytes.Shift()
         end for
-        parse_moov_file(bytes)
+        parse_moov_file(bytes, moov_start, delta, filename, delete_length)
     end if
 End Function
