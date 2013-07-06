@@ -111,7 +111,11 @@ Function subtract_strings(a as String, b as String)
     while c[0] = 48
         c.shift()
     end while
-    return c.toAsciiString()
+    if c.count() = 0 then 
+        return "0"
+    else
+        return c.toAsciiString()
+    end if
 End Function
 
 ' This is for importing a number from an N-byte hex value into a string
