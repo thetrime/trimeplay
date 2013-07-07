@@ -61,7 +61,6 @@ Function parse_http_status(connection as Object, reply as Object)
         if code = 10 then
             line = reply.status_bytes.toAsciiString()
             reply.status = mid(line, 10, 3)
-            print "Status is:" ; reply.status
             reply.state = 4
             reply.headerName = createobject("roByteArray")
             parse_http_headers(connection, reply)
