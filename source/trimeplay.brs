@@ -144,7 +144,7 @@ Function Main()
                     if connection.isReadable() and connection.getCountRcvBuf() = 0 Then
                         ' Apparently this means the connection has been closed
                         ' What a terrible way to indicate it
-                        print "Connection is closed"
+                        print "Connection " ; connection.getID() ; " is closed"
                         connection.close()
                         m.sockets[Stri(event.getSocketID())] = invalid
                     Else                    

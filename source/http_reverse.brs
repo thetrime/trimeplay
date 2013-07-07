@@ -33,6 +33,7 @@ Function read_http_reply(reply as Object, connection as Object)
         reply.buffer[length-1] = 0
         reply.buffer[length-1] = invalid
         r = connection.receive(reply.buffer, 0, length)
+        debug_buffer("Just read", reply.buffer, 0)
         if r <> length then
             print "Read " ; r ; " instead of " ; length
             stop
@@ -64,6 +65,7 @@ Function parse_http_status(connection as Object, reply as Object)
             reply.state = 4
             reply.headerName = createobject("roByteArray")
             parse_http_headers(connection, reply)
+            exit while
         else if code <> 13 then
             reply.status_bytes.Push(code)
         End if
