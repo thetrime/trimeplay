@@ -178,7 +178,7 @@ Function parse_http_search(connection as Object, request as Object)
     While request.buffer.Count() > 0
         code = request.buffer.Shift()
         If code = 32 Then
-            munge_search(request)
+            munge_search(request) 
             request.state = 3
             parse_http_version(connection, request)
             Exit While
@@ -194,13 +194,13 @@ Sub munge_search(request as Object)
         If code = 61 Then '=
            name = name_bytes.toAsciiString()
            name_bytes = createobject("roByteArray")
-           print name
         Else If code = 38 Then '&
            if name = invalid then
                request.search[name_bytes.toAsciiString()] = ""
            Else
                request.search[name] = name_bytes.toAsciiString()
            End if
+           name_bytes = createobject("roByteArray")
         Else
            name_bytes.Push(code)
         End If
