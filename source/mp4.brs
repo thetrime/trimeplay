@@ -41,7 +41,7 @@ Function handle_mp4_data(request as Object, socket as Object)
     end if    
 
     if atom_name = "moov" then
-        request.moov_length = atom_length
+        GetGlobalAA().moov_length = atom_length
         GetGlobalAA().moov_start = request.start_byte
         print "Set moov_start to " ; GetGlobalAA().moov_start
         ' Awesome. Now we need to find the mvhd atom by descending INTO the moov atom
@@ -99,8 +99,8 @@ Function handle_mp4_data(request as Object, socket as Object)
             inflated = inflate(request.body)
             ' Supeyb. Save this for later in a temporary file
             filename = "tmp:/moov.dat"
-            print GetGlobalAA().moov_start ; filename ; uncompressed_size
-            parse_moov_file(inflated, GetGlobalAA().moov_start, filename, uncompressed_size)
+            print GetGlobalAA().moov_start ; filename ; GetGlobalAA().moov_length
+            parse_moov_file(inflated, GetGlobalAA().moov_start, filename, GetGlobalAA().moov_length)
             inflated.WriteFile(filename)
             foo()
             return true
@@ -251,7 +251,7 @@ Function parse_moov_file(bytes as Object, moov_start as String, filename as Stri
     
             ' Now, we cannot simply pass the URL to roku, because it will choke on the cmov. Instead, pretend WE are the host
             ' When we get this request, we are going to have to stitch in the decompressed moov atom on the fly. Yikes.
-            proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url + "&delta=" + delta + "&edit_from=" + moov_start + "&edit_source=" + filename + "&edit_length=" + uncompressed_size
+            proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url + "&delta=" + delta + "&edit_from=" + moov_start + "&edit_source=" + filename + "&edit_length=" + compressed_size
             print "Proxy URL is " ; proxy_url
             content.Stream = { url:proxy_url
                            quality:false
@@ -332,3 +332,4 @@ Function moov_test()
     bytes.WriteFile("tmp:/moov2.dat")
     print "Parse complete"
 End Function
+

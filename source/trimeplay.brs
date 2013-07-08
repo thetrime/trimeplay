@@ -16,7 +16,7 @@
 
 Function Main()
     'ztest()
-    moov_test()
+    'moov_test()
     msgPort = createobject("roMessagePort") 
     m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
     'm.features_hex = "0x3"
