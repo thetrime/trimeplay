@@ -1,3 +1,5 @@
+' This code is based on the puff implementation provided with zlib.
+
 Function BitStream(raw as Object)
     return {  raw: raw
          read_bit: read_bit
