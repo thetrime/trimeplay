@@ -99,9 +99,10 @@ Function handle_mp4_data(request as Object, socket as Object)
             inflated = inflate(request.body)
             ' Supeyb. Save this for later in a temporary file
             filename = "tmp:/moov.dat"
+            print GetGlobalAA().moov_start ; filename ; uncompressed_size
+            parse_moov_file(inflated, GetGlobalAA().moov_start, filename, uncompressed_size)
             inflated.WriteFile(filename)
-            print GetGlobalAA().moov_start ; filename ; uncompressed_size ; "unknown"
-            parse_moov_file(inflated, GetGlobalAA().moov_start, filename, uncompressed_size, "unknown")
+            foo()
             return true
             'print "This is just too hard"
             'give_up("mp4")
@@ -214,52 +215,120 @@ Function send_mp4_request_on_socket(request as Object, socket as Object)
 End Function
 
 
-Function parse_moov_file(bytes as Object, moov_start as String, filename as String, uncompressed_size as String, moov_length as String)
-    atom_length = bytes.Shift()
-    atom_length = atom_length * 256 + bytes.Shift()
-    atom_length = atom_length * 256 + bytes.Shift()
-    atom_length = atom_length * 256 + bytes.Shift()
-
-    atom_name = chr(bytes.shift())
-    atom_name = atom_name + chr(bytes.shift())
-    atom_name = atom_name + chr(bytes.shift())
-    atom_name = atom_name + chr(bytes.shift())
+Function parse_moov_file(bytes as Object, moov_start as String, filename as String, compressed_size as String)
+    moov_length = "unknown"
+    delta = "unknown"
+    i = 0
+    while i < bytes.count() 
+        print "Parsing moov file at " ; i
+        atom_length = bytes[i]
+        atom_length = atom_length * 256 + bytes[i+1]
+        atom_length = atom_length * 256 + bytes[i+2]
+        atom_length = atom_length * 256 + bytes[i+3]
+        atom_name = chr(bytes[i+4])
+        atom_name = atom_name + chr(bytes[i+5])
+        atom_name = atom_name + chr(bytes[i+6])
+        atom_name = atom_name + chr(bytes[i+7])
+        i = i + 8
+        print "Got atom " ; atom_name ; " of length " ; atom_length
+        if atom_name = "moov" then
+            uncompressed_size = atom_length.toStr()
+            'parse_moov_file(bytes, i+8, moov_start, filename, uncompressed_size, atom_length.toStr(), delta)
+        else if atom_name = "mvhd" then
+            timescale = (((((bytes[i+12] * 256) + bytes[i+13]) * 256) + bytes[14]) * 256) + bytes[i+15]
+            duration = (((((bytes[i+16] * 256) + bytes[i+17]) * 256) + bytes[i+17]) * 256) + bytes[i+19]
+            GetGlobalAA().video_duration = duration / timescale
+            print "Movie length detected to be " ; GetGlobalAA().video_duration ; " seconds"
+            content = {}        
+            GetGlobalAA().content = content
+            play_start = Int(GetGlobalAA().video_duration * GetGlobalAA().current_video_fraction)
+            print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
     
-    if atom_name = "moov" then
-        parse_moov_file(bytes, moov_start, filename, uncompressed_size, atom_length.toStr())
-    else if atom_name = "mvhd" then
-        timescale = (((((bytes[12] * 256) + bytes[13]) * 256) + bytes[14]) * 256) + bytes[15]
-        duration = (((((bytes[16] * 256) + bytes[17]) * 256) + bytes[17]) * 256) + bytes[19]
-        GetGlobalAA().video_duration = duration / timescale
-        print "Movie length detected to be " ; GetGlobalAA().video_duration ; " seconds"
-        content = {}
-        play_start = Int(GetGlobalAA().video_duration * GetGlobalAA().current_video_fraction)
-        print "Starting from " ; play_start ; "(of type " ; type(play_start) ; ")"
+            ' We can now compute the delta
+            print "Computing delta: " ; uncompressed_size ; " and " ; compressed_size
+            delta = subtract_strings(uncompressed_size, compressed_size)
+    
+    
+            ' Now, we cannot simply pass the URL to roku, because it will choke on the cmov. Instead, pretend WE are the host
+            ' When we get this request, we are going to have to stitch in the decompressed moov atom on the fly. Yikes.
+            proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url + "&delta=" + delta + "&edit_from=" + moov_start + "&edit_source=" + filename + "&edit_length=" + uncompressed_size
+            print "Proxy URL is " ; proxy_url
+            content.Stream = { url:proxy_url
+                           quality:false
+                         contentid:"airplay-content"}
+            content.length = int(GetGlobalAA().video_duration)
+            content.playstart = play_start
+            content.StreamFormat = "mp4"
+            'parse_moov_file(bytes, i+atom_length+8, moov_start, filename, uncompressed_size, moov_length, delta)
+            i = i + atom_length
+        else if atom_name = "trak" then    
+            'parse_moov_file(bytes, i+8, moov_start, filename, uncompressed_size, moov_length, delta)
+            'parse_moov_file(bytes, i+atom_length+8, moov_start, filename, uncompressed_size, moov_length)
+        else if atom_name = "mdia" then
+            'parse_moov_file(bytes, i+8, moov_start, filename, uncompressed_size, moov_length, delta)
+            'parse_moov_file(bytes, i+atom_length+8, moov_start, filename, uncompressed_size, moov_length)
+        else if atom_name = "minf" then
+            'parse_moov_file(bytes, i+8, moov_start, filename, uncompressed_size, moov_length, delta)
+            'parse_moov_file(bytes, i+atom_length+8, moov_start, filename, uncompressed_size, moov_length)
+        else if atom_name = "stbl" then
+            'parse_moov_file(bytes, i+8, moov_start, filename, uncompressed_size, moov_length, delta)
+            'parse_moov_file(bytes, i+atom_length+8, moov_start, filename, uncompressed_size, moov_length)
+        else if atom_name = "stco" then
+            print "Got one!" 
+            ' There are 4 bytes of version and flags, which I will ignore. 
+            i = i + 4
+            ' which is the length of the table
+            table_length = bytes[i]
+            table_length = table_length * 256 + bytes[i+1]
+            table_length = table_length * 256 + bytes[i+2]
+            table_length = table_length * 256 + bytes[i+3]
+            print "stco table has " ; table_length ; " entries"
+            for j = 0 to table_length-1
+                print "Entry " ; j ; ": " ; bytes[i+4+4*j] ; ", " ; bytes[i+4+4*j+1] ; ", " ; bytes[i+4+4*j+2] ; ", " ; bytes[i+4+4*j+3] 
+                x = bytes[i+4+4*j]
+                x = x * 256 + bytes[i+4+4*j+1]
+                x = x * 256 + bytes[i+4+4*j+2]
+                x = x * 256 + bytes[i+4+4*j+3]
+                print "Value: " ; x
+                ' Got an offset. Adjust it by delta
+                x = x + val(delta)
+                print delta
+                print "    -> " ; x
+                ' Now write it back
+                bytes[i+4+4*j+3] = x mod 256
+                x = x / 256
+                bytes[i+4+4*j+2] = x mod 256
+                x = x / 256
+                bytes[i+4+4*j+1] = x mod 256
+                bytes[i+4+4*j] = x / 256
+                print "is now " ; bytes[i+4+4*j] ; ", " ; bytes[i+4+4*j+1] ; ", " ; bytes[i+4+4*j+2] ; ", " ; bytes[i+4+4*j+3] 
+            end for
+            i = i + atom_length - 12
+            'parse_moov_file(bytes, i+atom_length, moov_start, filename, uncompressed_size, moov_length, delta)
+        else
+            print "Skipping forward to " ; i+atom_length
+            i = i + atom_length - 8
+            'parse_moov_file(bytes, i+atom_length, moov_start, filename, uncompressed_size, moov_length, delta)
+        end if
+    End While
+End Function
 
-        ' We can now compute the delta
-        print "Computing delta: " ; uncompressed_size ; " and " ; moov_length
-        delta = subtract_strings(uncompressed_size, moov_length)
+' Need to adjust moov.trak.mdia.minf.stbl.stco 
+
+Function foo()
+    GetGlobalAA().video_state = 0
+    aa = GetGlobalAA()
+    aa.video_screen.setContent(GetGlobalAA().content)
+    aa.video_screen.Pause()
+End Function
 
 
-        ' Now, we cannot simply pass the URL to roku, because it will choke on the cmov. Instead, pretend WE are the host
-        ' When we get this request, we are going to have to stitch in the decompressed moov atom on the fly
-        proxy_url = "http://localhost:7000/proxy?original_url=" + GetGlobalAA().current_video_url + "&delta=" + delta + "&edit_from=" + moov_start + "&edit_source=" + filename + "&edit_length=" + uncompressed_size
-        print "Proxy URL is " ; proxy_url
-        content.Stream = { url:proxy_url
-                       quality:false
-                     contentid:"airplay-content"}
-        content.length = int(GetGlobalAA().video_duration)
-        content.playstart = play_start
-        content.StreamFormat = "mp4"
-        GetGlobalAA().video_state = 0
-        aa = GetGlobalAA()
-        aa.video_screen.setContent(content)
-        aa.video_screen.Pause()
-    else
-        ' Is this really the only way to truncate an array? :(
-        For i = 1 to atom_length
-            bytes.Shift()
-        end for
-        parse_moov_file(bytes, moov_start, filename, uncompressed_size, "unknown")
-    end if
+Function moov_test()
+    bytes = createobject("roByteArray")
+    bytes.ReadFile("pkg:/moov.dat")
+    GetGlobalAA().current_video_fraction = 0
+    GetGlobalAA().current_video_url = "fake"
+    parse_moov_file(bytes, "32", "tmp:/foo.dat", "19552")
+    bytes.WriteFile("tmp:/moov2.dat")
+    print "Parse complete"
 End Function
