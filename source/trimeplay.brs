@@ -103,7 +103,7 @@ Function Main()
         'print "Waiting in main loop"
         event = wait(0, msgPort)
         If type(event)="roSocketEvent"
-            print "Got event on " ; event.getSocketID()
+            'print "Got event on " ; event.getSocketID()
             If event.getSocketID() = udp.getID()
                 If udp.isReadable()
                    message = createobject("roByteArray")
@@ -193,10 +193,10 @@ Sub handle_tcp(connection as Object)
         request = create_new_request()        
         m.connections[Stri(connection.getID())] = request
     End if
-    print "Reading some stuff"
+    'print "Reading some stuff"
     status = request.read_data(request, connection)
     If status = false Then ' More data is required
-       print "Not yet finished"
+       'print "Not yet finished"
        return
     Else if status = true Then 'Data is complete. Execute handler
         ' Regardless of whether the socket is to be closed, the HTTP request has finished. We have to invalidate it here

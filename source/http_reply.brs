@@ -78,9 +78,13 @@ End Function
 
 
 Function handle_photo(http as Object, connection as Object)
-    print "About to save data to file..." ; str(http.body.Count())
-    filename = "tmp:/" + http.headers["X-Apple-AssetKey"] + ".jpg"
-    print http.body.WriteFile(filename)
+    filename = "tmp:/" + http.headers["X-Apple-AssetKey"] + ".jpg" 
+    if http.body_size <> 0 then
+        print http.body.WriteFile(filename)
+    end if
+    if http.headers["x-apple-assetaction"] <> invalid and http.headers["x-apple-assetaction"] = "cacheOnly" then
+        return send_http_reply(connection, "text/x-apple-plist+xml", "")
+    end if
     bitmap = CreateObject("roBitmap", filename)
     print "About to draw image: " ; bitmap
     If m.state <> "photo" Then
@@ -95,10 +99,12 @@ Function handle_photo(http as Object, connection as Object)
     m.state = "photo"
     screen_width = m.display_size.w
     screen_height = m.display_size.h
-    x_offset = Int((screen_width - bitmap.GetWidth())/2)
-    y_offset = Int((screen_height - bitmap.GetHeight())/2)
-    m.photo_screen.SetLayer(1, [{url:filename,
-                    TargetRect:{x:x_offset, y:y_offset, w:bitmap.GetWidth(), h:bitmap.getHeight()}}])
+    if bitmap <> invalid then
+        x_offset = Int((screen_width - bitmap.GetWidth())/2)
+        y_offset = Int((screen_height - bitmap.GetHeight())/2)
+        m.photo_screen.SetLayer(1, [{url:filename,
+                        TargetRect:{x:x_offset, y:y_offset, w:bitmap.GetWidth(), h:bitmap.getHeight()}}])
+    end if
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
