@@ -1,11 +1,3 @@
-Function handle_fairplay(http as Object, connection as Object)
-    reply = createobject("roByteArray")
-    packet = "HTTP/1.1 404 Not Found" + chr(13) + chr(10)
-    reply.fromAsciiString(packet)
-    status = connection.send(reply, 0, reply.Count())
-    return status    
-End Function
-
 Function handle_reverse(http as Object, connection as Object)
     reply = createobject("roByteArray")
     reply.fromAsciiString("HTTP/1.1 101 Switching Protocols" + chr(13) + chr(10) + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10) + "Upgrade: PTTH/1.0" + chr(13) + chr(10) + "Connection: Upgrade" + chr(13) + chr(10) + chr(13) + chr(10))
