@@ -6,10 +6,10 @@ Sub respond_to_dns(dns as Object, udp as Object)
         For Each part in question
             uri = uri + part + "."
         End For
-        print "Query received for " ; uri
-        If uri = "_raop._tcp.local." or uri = "_airplay." or uri = "_raop." or uri = "_services._dns-sd._udp.local." or  uri = "roku._airplay._tcp.local." Then 
+        'print "Query received for " ; uri
+        If uri = "_raop._tcp.local." or uri = "_airplay." or uri = "_raop." or uri = "_services._dns-sd._udp.local." or  uri = "roku._airplay._tcp.local." or uri = "roku._airplay.roku._airplay." or uri = "_airplay._tcp.local." or uri = "_raop._raop." Then 
             announce = announce_packet()
-            print "Announcing...."
+            'print "Announcing...."
             result = udp.send(announce, 0, announce.Count())
         End If
     End For
@@ -215,10 +215,7 @@ Sub encode_ptr(announce as Object, auth as Object)
     announce.Push(1)        
 
     ' TTL is 1:15:00
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(17)
-    announce.Push(148)
+    set_ttl(announce, 4500)
 
     ' Store the length
     length = auth.Count() + 1
@@ -242,10 +239,7 @@ Sub encode_host(announce as Object, auth as Object)
     announce.Push(1)        
 
     ' TTL is 120s
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(120)
+    set_ttl(announce, 120)
 
     ' Store the length
     announce.Push(0)
@@ -256,7 +250,12 @@ Sub encode_host(announce as Object, auth as Object)
     End For
 End Sub
     
-
+Sub set_ttl(packet as Object, ttl as integer)
+    packet.Push(0)
+    packet.Push(0)
+    packet.Push(ttl / 256)
+    packet.Push(ttl MOD 256)
+End Sub
 
 Sub encode_service(announce as Object, auth as Object)
     ' Set the type to SRV
@@ -268,10 +267,7 @@ Sub encode_service(announce as Object, auth as Object)
     announce.Push(1)        
 
     ' TTL is 120s
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(120)
+    set_ttl(announce, 120)
 
     ' Store the length
     length = auth["hostname"].Count() + 1
@@ -308,10 +304,7 @@ Sub encode_text(announce as Object, texts as Object)
     announce.Push(1)        
 
     ' TTL is 1:15:00
-    announce.Push(0)
-    announce.Push(0)
-    announce.Push(17)
-    announce.Push(148)
+    set_ttl(announce, 4500)
 
     ' Store the length
     length = texts.Count()
