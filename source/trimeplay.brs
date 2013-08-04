@@ -35,6 +35,11 @@ Function Main()
 
     device_info = createobject("roDeviceInfo")
     m.display_size = device_info.getDisplaySize()
+    addresses = device_info.GetIPAddrs()
+    for each key in addresses
+        m.hostname = "roku/" + addresses[key]
+        exit for
+    end for
 
     default_screen = createobject("roImageCanvas")
     default_screen.SetMessagePort(msgPort)
@@ -88,6 +93,32 @@ Function Main()
         stop
     end if
 
+    ' Set up the other unadvertised mirroring TCP socket just for fun
+    mirror2 = createobject("roStreamSocket")
+    mirror2.setMessagePort(msgPort)
+    mirror2_bind_addr = CreateObject("roSocketAddress")
+    mirror2_bind_addr.setPort(7001)
+    mirror2.setAddress(mirror2_bind_addr)
+    mirror2.notifyReadable(true)
+    mirror2.listen(4)
+    if not mirror2.eOK() 
+        print "Could not create mirror2 TCP socket"
+        stop
+    end if
+
+    ' Set up the event_port for mirroring
+    mirror3 = createobject("roStreamSocket")
+    mirror3.setMessagePort(msgPort)
+    mirror3_bind_addr = CreateObject("roSocketAddress")
+    mirror3_bind_addr.setPort(49154)
+    mirror3.setAddress(mirror3_bind_addr)
+    mirror3.notifyReadable(true)
+    mirror3.listen(4)
+    if not mirror3.eOK() 
+        print "Could not create mirror3 TCP socket"
+        stop
+    end if
+
 
     ' Need to broadcast that we are an Apple TV, rather than just waiting to be polled. Sometimes this helps
     udp.setBroadcast(true)
@@ -136,6 +167,30 @@ Function Main()
                      client.setMessagePort(msgPort)
                      m.sockets[Stri(client.getID())] = client
                 End If
+            Else if event.getSocketID() = mirror2.getID()
+                 print "MIRRORING2 CONNECTION?"
+                 ' I do not know what this socket is used for.
+                 ' I suspect we have to answer, but we dont have to talk on it
+                 client = mirror2.accept()
+                 If client = Invalid
+                     print "Accept failed"                   
+                 Else
+                     client.notifyReadable(true)
+                     client.setMessagePort(msgPort)
+                     m.sockets[Stri(client.getID())] = client
+                End If
+            Else if event.getSocketID() = mirror3.getID()
+                 ' I do not know what this socket is used for, either
+                 print "MIRRORING3 CONNECTION?"
+                 client = mirror3.accept()
+                 If client = Invalid
+                     print "Accept failed"                   
+                 Else
+                     client.notifyReadable(true)
+                     client.setMessagePort(msgPort)
+                     m.sockets[Stri(client.getID())] = client
+                End If
+
             Else
                 ' Must be a client connection!
                 connection = m.sockets[Stri(event.getSocketID())]

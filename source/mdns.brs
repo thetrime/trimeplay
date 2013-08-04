@@ -119,9 +119,9 @@ Function announce_packet()
     announce[10] = 0
     announce[11] = ip_addresses.count()
     
-    encode_questions(announce, [["roku", "_airplay", "_tcp", "local"]])
+    encode_questions(announce, [[m.hostname, "_airplay", "_tcp", "local"]])
 '-----------------------------------------------------------------------------------------------------------
-    data = [{qname:["roku", "_airplay", "_tcp", "local"],
+    data = [{qname:[m.hostname, "_airplay", "_tcp", "local"],
               text:["deviceid=" + m.mac,
                     "features=" + m.features_hex,
                     "model=AppleTV2,1"
@@ -151,22 +151,22 @@ Function announce_packet()
                ptr:["_raop", "_tcp", "local"]},
 
             {qname:["_airplay", "_tcp", "local"],
-               ptr:["roku", "_airplay", "_tcp", "local"]},
+               ptr:[m.hostname, "_airplay", "_tcp", "local"]},
 
             {qname:["_raop", "_tcp", "local"],
                ptr:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"]},
 
-            {qname:["roku", "_airplay", "_tcp", "local"],
+            {qname:[m.hostname, "_airplay", "_tcp", "local"],
            service:{port:7000,
-                hostname:["roku", "local"]}},
+                hostname:[m.hostname, "local"]}},
   
             {qname:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"],
            service:{port:7100,
-                hostname:["roku", "local"]}}]
+                hostname:[m.hostname, "local"]}}]
 
 
     For Each ip in ip_addresses
-        data.push({qname:["roku", "local"],
+        data.push({qname:[m.hostname, "local"],
                        a:ip})
     End For
     encode_answers(announce, data)
