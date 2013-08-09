@@ -2,10 +2,12 @@ Function create_new_request()
     return {  state: 0
             headers: {}
              method: ""
+            version: ""
           body_size: 0
              search: {}
           read_data: read_http
        process_data: dispatch_http
+       versionBytes: createobject("roByteArray")
           pathBytes: createobject("roByteArray")
              buffer: createobject("roByteArray")
                body: createobject("roByteArray")
@@ -137,9 +139,16 @@ Function parse_http_version(connection as Object, request as Object)
         If code = 10 Then
            request.state = 4
            request.headerName = createobject("roByteArray")
+           request.version = request.versionBytes.toAsciiString()
+           If request.version = "RTSP/1.0" Then
+               request.process_data = dispatch_rtsp
+           End If
            parse_http_headers(connection, request)
            Exit While
+        else if code <> 13 then
+            request.versionBytes.push(code)
         End If
+        
     End While
 End Function
 
