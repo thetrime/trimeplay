@@ -48,23 +48,23 @@ Function handle_slideshow_features(http as Object, connection as Object)
                                                                                             "</plist>"]))
 End Function
 
-Function handle_stream(http as Object, connection as Object)
+Function handle_stream_xml(http as Object, connection as Object)
     ' Really? You cannot escape quotes?!
     return send_http_reply(connection, "text/x-apple-plist+xml", list_concat_with_newlines(["<?xml version=" + chr(34) + "1.0" + chr(34) + " encoding=" + chr(34) + "UTF-8" + chr(34) + "?>",
                                                                                             "<!DOCTYPE plist PUBLIC " + chr(34) + "-//Apple//DTD PLIST 1.0//EN" + chr(34) + " " + chr(34) + "http://www.apple.com/DTDs/PropertyList-1.0.dtd" + chr(34) + ">",
                                                                                             "<plist version=" + chr(34) + "1.0" + chr(34) + ">",
-                                                                                            " <dict>",
-                                                                                            "   <key>height</key>",
-                                                                                            "   <integer>720</integer>",
-                                                                                            "   <key>overscanned</key>",
-                                                                                            "   <true/>",
-                                                                                            "   <key>refreshRate</key>",
-                                                                                            "   <real>0.016666666666666666</real>",
-                                                                                            "   <key>version</key>",
-                                                                                            "   <string>130.14</string>",
-                                                                                            "   <key>width</key>",
-                                                                                            "   <integer>1280</integer>",
-                                                                                            " </dict>",
+                                                                                            "<dict>",
+                                                                                            " <key>height</key>",
+                                                                                            " <integer>1080</integer>",
+                                                                                            " <key>overscanned</key>",
+                                                                                            " <false/>",
+                                                                                            " <key>refreshRate</key>",
+                                                                                            " <real>0.01666666753590107</real>",
+                                                                                            " <key>version</key>",
+                                                                                            " <string>150.33</string>",
+                                                                                            " <key>width</key>",
+                                                                                            " <integer>1920</integer>",
+                                                                                            "</dict>",
                                                                                             "</plist>"]))
 End Function
 
@@ -279,6 +279,19 @@ Function handle_get_property(http as Object, connection as Object)
     return send_http_reply(connection, "text/x-apple-plist+xml", "")
 End Function
 
+Function handle_stream(http as Object, connection as Object)
+    ' Data is a bplist (yrch) followed by video data
+    print http.body
+    params = parse_bplist(http.body)
+    print "param1: " ; params["param1"]
+    print "param2: " ; params["param2"]
+    ' Connection is now a stream containing possibly encrypted video data. We have to stop treating like an HTTP stream
+    ' and probably buffer the data somewhere, then tell the roku to connect to a proxy to receive the decrypted data
+    ' as a stream.        
+    GetGlobalAA().connections[Stri(connection.getID())] = create_new_packetized_video_listener()
+    ' At this point they are not expecting a reply (I think)
+    return 0
+End Function
 
 
 Function list_concat_with_newlines(chunks as Object)
@@ -320,9 +333,11 @@ Function send_http_reply(connection as Object, content_type as String, data as S
     packet = packet + "Date: " + rfc822 + chr(13) + chr(10)    
     'packet = packet + "Date: Thu, 23 Feb 2012 17:33:41 GMT" + chr(13) + chr(10)
     packet = packet + "Content-Type: " + content_type + chr(13) + chr(10)
-    packet = packet + "Content-Length: " + str(len(data)) + chr(13) + chr(10) + chr(13) + chr(10)
+    packet = packet + "Content-Length: " + len(data).toStr() + chr(13) + chr(10) + chr(13) + chr(10)
     packet = packet + data
     reply.fromAsciiString(packet)
+    'print packet
+    print reply.toHexString()
     status = connection.send(reply, 0, reply.Count())
     return status
 End Function
@@ -347,6 +362,8 @@ Function dispatch_http(http as Object, connection as Object)
     Else If http.path = "/rate" Then
         status = handle_rate(http, connection)
     Else If http.path = "/stream.xml" Then
+        status = handle_stream_xml(http, connection)
+    Else If http.path = "/stream" Then
         status = handle_stream(http, connection)
     Else If http.path = "/setProperty" Then
         status = handle_set_property(http, connection)
@@ -355,6 +372,7 @@ Function dispatch_http(http as Object, connection as Object)
     Else If http.path = "/scrub" Then
         status = handle_scrub(http, connection)
     Else If http.path = "/fp-setup" Then
+        print "fp-setup on HTTP?"
         status = handle_fairplay(http, connection)
     Else If http.path = "/getProperty" Then
         status = handle_get_property(http, connection)
