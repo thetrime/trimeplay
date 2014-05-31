@@ -127,7 +127,7 @@ Function announce_packet()
                     "model=AppleTV2,1"
                     "srcvers=101.28"]},
 
-            {qname:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"],
+            {qname:[m.mac_no_colon + "@roku", "_raop", "_tcp", "local"],
               text:["txtvers=1"
                     "ch=2"
                     "cn=0,1,2,3"
@@ -154,13 +154,13 @@ Function announce_packet()
                ptr:["roku", "_airplay", "_tcp", "local"]},
 
             {qname:["_raop", "_tcp", "local"],
-               ptr:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"]},
+               ptr:[m.mac_no_colon+"@roku", "_raop", "_tcp", "local"]},
 
             {qname:["roku", "_airplay", "_tcp", "local"],
            service:{port:7000,
                 hostname:["roku", "local"]}},
   
-            {qname:["CAFEBABEFA17@roku", "_raop", "_tcp", "local"],
+            {qname:[m.mac_no_colon + "@roku", "_raop", "_tcp", "local"],
            service:{port:7100,
                 hostname:["roku", "local"]}}]
 

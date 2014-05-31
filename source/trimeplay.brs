@@ -17,14 +17,15 @@
 Function Main()
     'ztest()
     'moov_test()
-    msgPort = createobject("roMessagePort") 
-    m.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
+    msgPort = createobject("roMessagePort")
+    'm.mac = "CA:FE:BA:BE:FA:17"                 ' FIXME: fake?
+    'm.mac = "B8:3E:59:39:9F:FD"
     'm.features_hex = "0x3"
     'm.features_dec = "3"
     'm.features_hex = "0x39f7"
     'm.features_dec = "14839"
 
-    m.features_hex = "0x3fff"
+    m.features_hex = "0x77"
     m.features_dec = "16383"
 
     ' Set up some stuff so we can display screens later in the http handlers
@@ -38,6 +39,7 @@ Function Main()
 
     default_screen = createobject("roImageCanvas")
     default_screen.SetMessagePort(msgPort)
+
     default_screen.SetLayer(0, {Color:"#FF000000", CompositionMode:"Source"}) 
     default_screen.SetLayer(1, {text:"Waiting for connection"
                            TextAttrs:{Color:"#FFCCCCCC", Font:"Medium",
@@ -46,6 +48,9 @@ Function Main()
                                  TargetRect:{x:0,y:0,w:m.display_size.w,h:m.display_size.h}})
 
     default_screen.show()
+    m.mac_no_colon = UCase(get_mac(msgPort))
+    m.mac = Mid(m.mac_no_colon, 1, 2) + ":" + Mid(m.mac_no_colon, 3, 2) + ":" +  Mid(m.mac_no_colon, 5, 2) + ":" + Mid(m.mac_no_colon, 7, 2) + ":" +  Mid(m.mac_no_colon, 9, 2) + ":" + Mid(m.mac_no_colon, 11, 2)
+    print "Mac: " ; m.mac
 
     m.reverse_connection = invalid
     m.connections = {}
@@ -61,7 +66,6 @@ Function Main()
     group.setHostName("224.0.0.251")
     result = udp.joinGroup(group)
     udp.setMulticastLoop(false)
-
     ' Set up the about-to-be-advertised TCP socket
     tcp = createobject("roStreamSocket")
     tcp.setMessagePort(msgPort)
