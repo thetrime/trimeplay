@@ -91,8 +91,27 @@ Function parse_object(target as integer, offset_table as Object, raw as Object, 
             Else
                return (2^exponent) * decoded
             End If
+        else if length = 8 then
+            sign = (raw[offset+1-8] and 128) = 128
+            exponent = (raw[offset+1-8] and 127) * 16 or ((raw[offset+2-8] and 240) / 16) - 1023
+            significand = 4503599627370496 or (raw[offset+2-8] and 15) * 281474976710656 or raw[offset+3-8] * 1099511627776 or raw[offset+4-8] * 4294967296 or raw[offset+5-8] * 16777216 or raw[offset+6-8] * 65536 or raw[offset+7-8] * 256 or raw[offset+8-8]
+            mask = 4503599627370496
+            factor = 1
+            decoded = 0
+            For i = 0 to 52
+                if (significand and mask) = mask then
+                    decoded = decoded + factor
+                end if
+                factor = factor / 2
+                mask = mask / 2
+            End For
+            if sign Then
+               return (2^exponent) * (-decoded)
+            Else
+               return (2^exponent) * decoded
+            End If
         else
-            print "Double-precision IE7544 decoding not implemented"
+            print "Unexpected float length"
             stop   
         end if
     'Else If object_type = 3 Then

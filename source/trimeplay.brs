@@ -100,7 +100,7 @@ Function Main()
     result = udp.send(announce, 0, announce.Count())
     udp.notifyReadable(true) 
     While true
-        'print "Waiting in main loop"
+        print "Waiting in main loop"
         event = wait(0, msgPort)
         If type(event)="roSocketEvent"
             'print "Got event on " ; event.getSocketID()

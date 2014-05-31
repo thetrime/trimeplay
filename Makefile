@@ -13,4 +13,4 @@ $(PROJECT).zip:	$(SOURCES)
 	zip -ru $(PROJECT).zip source images manifest moov.dat -x \*~
 
 install:	$(PROJECT).zip
-	curl -s -S -F "mysubmit=Install" -F "archive=@$(PROJECT).zip" -F "passwd=" http://$(ROKU_DEV_TARGET)/plugin_install | grep "<font color" | sed "s/<font color=\"red\">//" | sed "s[</font>[["
+	curl --user rokudev:$(ROKU_DEV_PASSWORD) --digest -s -S -F "mysubmit=Install" -F "archive=@$(PROJECT).zip" -F "passwd=" http://$(ROKU_DEV_TARGET)/plugin_install | grep "<font color" | sed "s/<font color=\"red\">//" | sed "s[</font>[["
